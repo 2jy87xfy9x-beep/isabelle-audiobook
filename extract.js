@@ -14,11 +14,11 @@ function cleanHtml(raw) {
   let t = raw.replace(/<div[\s\S]*?<\/div>/g, ' ');
   // Strip all remaining HTML tags
   t = t.replace(/<[^>]+>/g, ' ');
-  // Strip noise markers
-  t = t.replace(/Leaming\s+reading\s+\S*/g, '');
-  t = t.replace(/\d+ minutes? left in chapter \d+%/gi, '');
-  t = t.replace(/\d+ minute ago left in chapter \d+%/gi, '');
-  t = t.replace(/\d+ minute\(s\) left in chapter \d+%/gi, '');
+  // Strip all "reading speed" / "minute left" noise markers and surrounding % artifacts
+  t = t.replace(/L[ei]a[mr]n?ing\s+reading\s+\S+/gi, '');
+  t = t.replace(/\d+\s*%?\s*minute[s]?\s+(?:ago\s+)?left\s+in\s+chapter\s+\d*\s*%?/gi, '');
+  t = t.replace(/minute[s]?\s+left\s+in\s+chapter\s+\d*\s*%?/gi, '');
+  t = t.replace(/\b\d+\s*%\s*(Letter|Tl|At)\s+\d+/gi, '');
   // Decode HTML entities
   t = t.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&#\d+;/g, ' ');
   // Collapse whitespace
