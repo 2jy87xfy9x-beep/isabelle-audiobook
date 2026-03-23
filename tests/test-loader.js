@@ -1,26 +1,40 @@
-// tests/test-loader.js — run with: node tests/test-loader.js
-import { resolvePosition, savePositionLocal, getSavedLocal } from '../js/loader.js';
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
 
-// Mock localStorage for Node
-const store = {};
-global.localStorage = {
-  getItem: k => store[k] ?? null,
-  setItem: (k, v) => { store[k] = v; }
-};
+const { resolvePosition } = await import('../js/loader.js');
 
-// Test 1: no local data → use remote
-let book = { lastPosition: 5, lastPositionTimestamp: 1000 };
-console.assert(resolvePosition(book) === 5, 'Test 1 failed');
+test('resolvePosition prefers more recent timestamp', () => {
+  const local = {
+    letter_id: 'letter-005',
+    paragraph_index: 2,
+    scroll_offset: 0,
+    active_view: 'plain_english',
+    timestamp: 2000,
+  };
+  const remote = {
+    letter_id: 'letter-001',
+    paragraph_index: 0,
+    scroll_offset: 0,
+    active_view: 'plain_english',
+    timestamp: 1000,
+  };
+  const result = resolvePosition(local, remote);
+  assert.equal(result.letter_id, 'letter-005');
+});
 
-// Test 2: local is newer → use local
-savePositionLocal(10);
-store['isabelle_position'] = JSON.stringify({ position: 10, timestamp: 2000 });
-book = { lastPosition: 5, lastPositionTimestamp: 1000 };
-console.assert(resolvePosition(book) === 10, 'Test 2 failed');
+test('resolvePosition falls back to remote when local is null', () => {
+  const remote = {
+    letter_id: 'letter-003',
+    paragraph_index: 0,
+    scroll_offset: 0,
+    active_view: 'plain_english',
+    timestamp: 500,
+  };
+  const result = resolvePosition(null, remote);
+  assert.equal(result.letter_id, 'letter-003');
+});
 
-// Test 3: remote is newer → use remote
-store['isabelle_position'] = JSON.stringify({ position: 3, timestamp: 500 });
-book = { lastPosition: 8, lastPositionTimestamp: 1500 };
-console.assert(resolvePosition(book) === 8, 'Test 3 failed');
-
-console.log('✓ loader tests passed');
+test('resolvePosition returns default when both null', () => {
+  const result = resolvePosition(null, null);
+  assert.equal(typeof result.letter_id, 'string');
+});
