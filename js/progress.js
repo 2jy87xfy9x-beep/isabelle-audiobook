@@ -1,43 +1,44 @@
-// js/progress.js
-// Updates progress bar and saves reading position.
+import { saveLocalPosition } from './loader.js';
+import { saveToGitHub } from './github.js';
 
-import { savePositionLocal } from './loader.js';
-
-let _syncCallback = null;
+const MIN_SYNC_INTERVAL = 60000;
 let _syncTimer = null;
-const SYNC_DEBOUNCE_MS = 60_000; // minimum 60s between GitHub syncs
+let _pendingSync = false;
+let _getBookFn = null;
 
-export function initProgress(totalParagraphs, syncCallback) {
-  _syncCallback = syncCallback;
-  updateBar(0, totalParagraphs);
+export function initProgress(getBook) {
+  _getBookFn = getBook;
 }
 
-export function updateProgress(index, totalParagraphs) {
-  updateBar(index, totalParagraphs);
-  savePositionLocal(index);
-  scheduleSync(index);
+export function savePosition(pos) {
+  saveLocalPosition(pos);
+  scheduleSyncPosition();
 }
 
-function updateBar(index, total) {
-  const fill = document.getElementById('progress-fill');
-  if (!fill || total === 0) return;
-  fill.style.width = `${Math.min(100, ((index + 1) / total) * 100)}%`;
-}
-
-function scheduleSync(index) {
-  if (!_syncCallback) return;
-  clearTimeout(_syncTimer);
-  _syncTimer = setTimeout(() => {
-    _syncCallback(index);
-  }, SYNC_DEBOUNCE_MS);
-}
-
-export function flushSync(index) {
-  clearTimeout(_syncTimer);
-  if (_syncCallback) _syncCallback(index);
-}
-
-/** Cancel any pending debounced sync without triggering it. Used before an explicit save. */
 export function cancelSync() {
-  clearTimeout(_syncTimer);
+  if (_syncTimer) {
+    clearTimeout(_syncTimer);
+    _syncTimer = null;
+  }
+  _pendingSync = false;
+}
+
+function scheduleSyncPosition() {
+  if (_pendingSync) return;
+  _pendingSync = true;
+  _syncTimer = setTimeout(async () => {
+    _pendingSync = false;
+    if (!_getBookFn) return;
+    const book = _getBookFn();
+    try {
+      await saveToGitHub('book.json', book);
+    } catch {
+      /* silent */
+    }
+  }, MIN_SYNC_INTERVAL);
+}
+
+export async function forceSyncPosition(book) {
+  cancelSync();
+  await saveToGitHub('book.json', book);
 }
