@@ -1,11 +1,11 @@
 const VIEW_LABELS = {
-  original_french: { tab: 'vieux fr', tip: 'Original Old French' },
-  modern_french: { tab: 'fr moderne', tip: 'Modern French' },
-  literal_english_old: { tab: 'en littéral', tip: 'Literal English of Old French' },
-  literal_english_modern: { tab: 'en mod fr', tip: 'Literal English of Modern French' },
-  plain_english: { tab: 'anglais', tip: 'Plain Modern English' },
-  handwriting_style: { tab: 'manuscrit', tip: 'Handwriting Style' },
-  photocopy: { tab: 'photocopie', tip: 'Original Photocopy' },
+  original_french:        { tab: 'vieux français', tip: 'Original Old French' },
+  modern_french:          { tab: 'français',       tip: 'Modern French' },
+  literal_english_old:    { tab: 'literal',        tip: 'Literal English — preserves Old French syntax' },
+  literal_english_modern: { tab: 'narration',      tip: 'Audio-ready English narration' },
+  plain_english:          { tab: 'english',        tip: 'Plain Modern English' },
+  handwriting_style:      { tab: 'manuscrit',      tip: 'Handwriting Style' },
+  photocopy:              { tab: 'photocopie',     tip: 'Original Photocopy' },
 };
 const TEXT_VIEWS = [
   'original_french',
