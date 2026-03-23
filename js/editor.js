@@ -79,6 +79,7 @@ export function applyFormat(action, value) {
   const para = _paragraphs[_activeIndex];
   const el = _activeEl;
   if (!para || !el) return;
+  para.style ??= {};
 
   switch (action) {
     case 'bold':

@@ -23,7 +23,7 @@ export async function fetchFromGitHub() {
 
   const res = await fetch(apiUrl(owner, repo), {
     headers: {
-      Authorization: `token ${token}`,
+      Authorization: `Bearer ${token}`,
       Accept: 'application/vnd.github.v3+json'
     }
   });
@@ -64,7 +64,7 @@ export async function saveToGitHub(localBook) {
   const res = await fetch(apiUrl(owner, repo), {
     method: 'PUT',
     headers: {
-      Authorization: `token ${token}`,
+      Authorization: `Bearer ${token}`,
       Accept: 'application/vnd.github.v3+json',
       'Content-Type': 'application/json'
     },
