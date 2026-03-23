@@ -4,7 +4,7 @@
 import { loadBook, resolvePosition } from './loader.js';
 import { renderBook, setCurrentParagraph, getParagraphEls } from './renderer.js';
 import { Player } from './player.js';
-import { initProgress, updateProgress, flushSync, cancelSync } from './progress.js';
+import { initProgress, updateProgress, cancelSync } from './progress.js';
 import { setMode as setFocusMode, applyMode } from './focusMode.js';
 import { initEditor, openEditor, closeEditor, applyFormat } from './editor.js';
 import { saveToGitHub } from './github.js';
