@@ -27,4 +27,9 @@ const chap = { id: 4, text: 'Chapter One', type: 'chapter-title', style: {} };
 const c = createParaElement(chap, 3);
 console.assert(c.tagName === 'H1', 'Test 4: should be H1');
 
+// Test 5: quote renders as <blockquote>
+const quote = { id: 5, text: 'A quote', type: 'quote', style: {} };
+const q = createParaElement(quote, 4);
+console.assert(q.tagName === 'BLOCKQUOTE', 'Test 5: should be BLOCKQUOTE');
+
 console.log('✓ renderer tests passed');

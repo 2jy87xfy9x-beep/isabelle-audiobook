@@ -16,7 +16,8 @@ export async function loadBook() {
  */
 export function resolvePosition(bookData) {
   const localRaw = localStorage.getItem('isabelle_position');
-  const local = localRaw ? JSON.parse(localRaw) : null;
+  let local = null;
+  try { local = localRaw ? JSON.parse(localRaw) : null; } catch { local = null; }
 
   const remote = {
     position: bookData.lastPosition ?? 0,
@@ -37,5 +38,5 @@ export function savePositionLocal(position) {
 
 export function getSavedLocal() {
   const raw = localStorage.getItem('isabelle_position');
-  return raw ? JSON.parse(raw) : { position: 0, timestamp: 0 };
+  try { return raw ? JSON.parse(raw) : { position: 0, timestamp: 0 }; } catch { return { position: 0, timestamp: 0 }; }
 }
