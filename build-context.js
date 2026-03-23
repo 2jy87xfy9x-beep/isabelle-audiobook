@@ -1,21 +1,9 @@
 // build-context.js — Node.js 18+, run from repo root
-// Reads context-seed.json, writes context.json (schema v2).
-// With ANTHROPIC_API_KEY: entity extraction via Claude. Without: chapter-based stub entries.
+// Reads context-seed.json, writes context.json (schema v2) from narrative chapters
+// and fixed seed entries. Expand or edit context.json by hand for Book 2 depth.
 
-import { readFileSync, writeFileSync, existsSync } from 'fs';
-import Anthropic from '@anthropic-ai/sdk';
+import { readFileSync, writeFileSync } from 'fs';
 
-function loadDotEnv() {
-  if (!existsSync('.env')) return;
-  const raw = readFileSync('.env', 'utf8');
-  for (const line of raw.split('\n')) {
-    const m = line.match(/^\s*ANTHROPIC_API_KEY\s*=\s*(.+?)\s*$/);
-    if (m) process.env.ANTHROPIC_API_KEY = m[1].replace(/^["']|["']$/g, '');
-  }
-}
-loadDotEnv();
-
-const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
 const seed = JSON.parse(readFileSync('context-seed.json', 'utf8'));
 
 function slugify(str) {
@@ -58,7 +46,7 @@ const OFFLINE_SEED_ENTITIES = [
   },
 ];
 
-function offlineEntries() {
+function buildEntries() {
   const entries = OFFLINE_SEED_ENTITIES.map((s) => ({
     ...s,
     content: [],
@@ -98,118 +86,11 @@ function offlineEntries() {
   return entries;
 }
 
-async function extractEntities(client) {
-  const allText = seed.chapters.map((ch) => ch.paragraphs.map((p) => p.text).join('\n')).join('\n\n');
-  const prompt = `Below is the text of a biography of Isabelle de Bourbon-Parma (1741–1763).
-
-Extract all significant named entities. Return a JSON array of objects, each with:
-{
-  "name": "Full name or title",
-  "type": "person|place|event|concept",
-  "aliases": ["alternative spellings or short names"],
-  "short": "One sentence description",
-  "chapter_hint": "which chapter this is most associated with"
-}
-
-Include: all named people, all named places, all named historical events, any key concepts (e.g. 'court etiquette').
-Exclude: Isabelle herself (she is the author), generic terms.
-Return ONLY the JSON array, no markdown.
-
-TEXT:
-${allText.slice(0, 12000)}`;
-
-  const msg = await client.messages.create({
-    model: MODEL,
-    max_tokens: 4096,
-    messages: [{ role: 'user', content: prompt }],
-  });
-  const raw = msg.content[0].text
-    .trim()
-    .replace(/^```json?\s*/i, '')
-    .replace(/\s*```$/i, '');
-  return JSON.parse(raw);
-}
-
-async function main() {
-  let entries;
-
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn(
-      'ANTHROPIC_API_KEY not set — building context from narrative chapters only (offline).'
-    );
-    entries = offlineEntries();
-  } else {
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    console.log('Extracting named entities from biographical text...');
-    let entities;
-    try {
-      entities = await extractEntities(client);
-      console.log(`  Found ${entities.length} entities`);
-    } catch (err) {
-      console.error('Entity extraction failed:', err.message);
-      entities = [];
-    }
-
-    entries = entities.map((entity) => ({
-      id: slugify(entity.name),
-      type: entity.type || 'person',
-      name: entity.name,
-      aliases: entity.aliases || [],
-      short: entity.short || '',
-      content: [],
-      images: [],
-      letterRefs: [],
-      relatedRefs: [],
-    }));
-
-    const seen = new Set();
-    entries = entries.filter((e) => {
-      if (!e.id || seen.has(e.id)) return false;
-      seen.add(e.id);
-      return true;
-    });
-
-    if (!entries.find((e) => e.id === 'marie-christine')) {
-      entries.unshift({
-        id: 'marie-christine',
-        type: 'person',
-        name: 'Marie-Christine of Austria',
-        aliases: ['Christine', 'Marie Christine', 'MC', 'Marie-Christine'],
-        short: "Isabelle's closest friend, confidante, and sister-in-law. Nearly all of Isabelle's surviving letters are addressed to her.",
-        content: [],
-        images: [],
-        letterRefs: [],
-        relatedRefs: [],
-      });
-    }
-
-    for (const ch of seed.chapters) {
-      const chText = ch.paragraphs.map((p) => p.text).join(' ').toLowerCase();
-      let bestEntry = null;
-      let bestCount = 0;
-      for (const entry of entries) {
-        const needle = entry.name.toLowerCase().slice(0, 40);
-        if (needle.length < 3) continue;
-        const n = (chText.match(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')) || []).length;
-        if (n > bestCount) {
-          bestCount = n;
-          bestEntry = entry;
-        }
-      }
-      if (bestEntry && bestCount >= 1) {
-        for (const p of ch.paragraphs) {
-          bestEntry.content.push({ id: `${bestEntry.id}-${p.id}`, text: p.text });
-        }
-      }
-    }
-  }
-
+function main() {
+  const entries = buildEntries();
   const context = { schema_version: 2, entries };
   writeFileSync('context.json', JSON.stringify(context, null, 2), 'utf8');
   console.log(`✓ context.json: ${entries.length} entries`);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+main();

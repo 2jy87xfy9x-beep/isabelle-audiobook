@@ -12,6 +12,14 @@ Hosted on GitHub Pages. Vanilla JS, no framework, no build step. Works on any de
 
 ---
 
+## Related specifications
+
+| Document | Purpose |
+| --- | --- |
+| [2026-03-23-executor-voice-sound-translate-for-audiobook.md](./2026-03-23-executor-voice-sound-translate-for-audiobook.md) | Optional scope from `C:\executor`: server TTS (Kokoro / voice clone), UI sound effects, machine-translation API, companion-server integration; phasing and copy-vs-rewrite notes. No in-app AI. |
+
+---
+
 ## Architecture — Approach B
 
 Two data files with bidirectional inline references. No separate mappings file.
@@ -655,8 +663,8 @@ All features degrade gracefully if any dependency is unavailable.
 
 ## Out of Scope (this version)
 
-- Generating the 5 text format views (done once by Claude, stored in book.json)
-- Writing Book 2 first draft (done by Claude as part of extraction/tagging work)
+- Generating the 5 text format views (authored outside the repo, then stored in `book.json`)
+- Writing Book 2 first draft (authored outside the repo; `context.json` is edited or imported by hand)
 - Mobile native app
 - Multi-user / collaboration
 - Full-text search across all letters (can be added later)

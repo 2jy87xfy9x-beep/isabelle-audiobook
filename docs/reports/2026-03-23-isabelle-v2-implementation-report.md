@@ -14,26 +14,13 @@ Plan A (content preparation) and Plan B (vanilla ES-module app) from the superpo
 
 - **`extract.js`** — Parses `Isabelle.html` with `jsdom`. Letter bodies are taken from the region after headings matching `LETTERS TO` / `MARIE-` / `CHRISTINE`, using `\bLetter\s+(\d+)\b` markers and longest slice per number (source text is noisy/OCR-like). **`book.json`**: `schema_version` 2, 194 letter slots, **82 complete** and 112 `complete: false` placeholders. Narrative chapters feed **`context-seed.json`**.
 - Page-marker detection was tightened so only small `<div>` markers (with `<hr>`, no nested `<p>`) count; the full `max-width:600px` column was previously misclassified as a single page strip.
-- **`generate-views.js`** — Intended to call the Anthropic API (`ANTHROPIC_MODEL` default `claude-sonnet-4-20250514`). Optional `.env` loading for `ANTHROPIC_API_KEY`.
-- **`build-context.js`** — Entity extraction via API when the key is set; otherwise offline seed entries (including **`marie-christine`**, Vienna/Parma/Habsburg stubs, plus narrative chapter entries) so **`context.json`** has ≥10 entries.
+- **`fill-views-from-original.js`** — Optional one-time helper: for complete letters, copies `views.original_french` into any still-null `modern_french`, `literal_english_*`, and `plain_english` slots so tests and the app have non-null text until editorial passes replace those fields.
+- **`build-context.js`** — Builds **`context.json`** from fixed seed entries (including **`marie-christine`**, Vienna/Parma/Habsburg stubs) plus one entry per narrative chapter in **`context-seed.json`** (no network calls).
 - **`map-refs.js`** — Alias-based `contextRefs` / `letterRefs`.
 
-### Environment note (important)
+### Content workflow (clarification)
 
-**`ANTHROPIC_API_KEY` was not set** in the agent environment. As implemented:
-
-- `generate-views.js` **copied `original_french` into all four generated view fields** so tests and the app have non-null `plain_english` (etc.) for every complete letter.
-- `build-context.js` used the **offline** context seed path.
-
-**Recommendation:** Set `ANTHROPIC_API_KEY` (and optionally `ANTHROPIC_MODEL`), then re-run:
-
-```bash
-cd C:\audio_book
-node generate-views.js
-node build-context.js
-node map-refs.js
-node --test tests/test-extract.js
-```
+Translations, paraphrases, and Book 2 prose are **authored outside this repository** and committed as JSON. The repo’s Node scripts only **parse** `Isabelle.html` or **reshape** local files; they do **not** call third-party text APIs. After changing HTML, run `extract.js`, optionally `fill-views-from-original.js`, then `build-context.js` and `map-refs.js`, and validate with tests.
 
 ### Plan A verification (run)
 
@@ -85,6 +72,6 @@ Multiple commits were made across Tasks 0–10; a few parallel `git commit` race
 
 See **[Next steps (full checklist)](next-steps-isabelle-v2.md)** in this folder for detailed procedures, QA lists, and links.
 
-1. Run **`generate-views.js`** and **`build-context.js`** with a real API key for production-quality translations and entity extraction.
+1. Replace propagated view text with **human-edited** content in `book.json` (or your external workflow), expand **`context.json`** entries, then re-run **`map-refs.js`** and tests.
 2. Consider **`git add Isabelle.html`** (and any docs you want tracked) if the book source should live in the repo; it remained untracked here.
 3. GitHub save from **`localhost`** will not resolve `*.github.io` hostname rules for `github.js`—expect save to prompt for missing config unless you adjust `getConfig()` for local dev or use GitHub Pages URL.

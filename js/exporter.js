@@ -82,7 +82,8 @@ function buildHtmlDoc(letters, views, forPrint) {
     })
     .join('<hr>');
 
-  return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
+  return `<!DOCTYPE html><html lang="en" translate="no"><head><meta charset="utf-8">
+  <meta name="google" content="notranslate">
   <title>Isabelle — Letters</title>
   <style>
     body{font-family:Georgia,serif;max-width:720px;margin:2rem auto;color:#1a1a1a;line-height:1.75}

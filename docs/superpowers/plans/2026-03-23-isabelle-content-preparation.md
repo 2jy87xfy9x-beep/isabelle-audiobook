@@ -2,11 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Rewrite `extract.js` to produce v2-schema `book.json` (letters as first-class objects) and an initial `context.json` (Book 2 seed), then generate all 5 text format views per letter using the Anthropic API.
+**Goal:** Rewrite `extract.js` to produce v2-schema `book.json` (letters as first-class objects) and an initial `context.json` (Book 2 seed). Fill the four derived letter views (`modern_french`, `literal_english_*`, `plain_english`) **outside this repository** (human editorial workflow, CAT tools, or any toolchain you choose), or run the optional **`fill-views-from-original.js`** once to copy `original_french` into empty slots for prototyping.
 
-**Architecture:** Two scripts: `extract.js` parses `Isabelle.html` into the v2 data model; `generate-views.js` calls the Claude API to produce the 5 text views per letter and writes them back into `book.json`. Both are one-time Node.js scripts, not part of the running app.
+**Architecture:** `extract.js` parses `Isabelle.html` into the v2 data model and writes `context-seed.json`. **`fill-views-from-original.js`** (optional) copies `original_french` into null view fields. **`build-context.js`** merges fixed seed entries and narrative chapters into **`context.json`** (no network calls). **`map-refs.js`** syncs cross-references. All are one-time Node scripts, not part of the running app.
 
-**Tech Stack:** Node.js 18+, ES modules, `@anthropic-ai/sdk`, `node --test` for validation, `jsdom` (already in devDependencies)
+**Tech Stack:** Node.js 18+, ES modules, `node --test` for validation, `jsdom` (devDependency).
+
+> **Clarification:** The repo holds **static JSON** and small parsers only. It does **not** ship vendor SDKs or HTTP clients for automated text generation.
 
 ---
 
@@ -28,38 +30,38 @@ Before touching code, understand what `Isabelle.html` contains:
 | File | Action | Responsibility |
 |---|---|---|
 | `extract.js` | **Rewrite** | Parse HTML → `book.json` (v2) + `context-seed.json` |
-| `generate-views.js` | **Create** | Anthropic API batch → populate 5 text views in `book.json` |
+| `fill-views-from-original.js` | **Create** (optional) | Copy `original_french` into null `views.*` for complete letters |
 | `book.json` | **Generated** | V2 letters schema |
 | `context.json` | **Generated** | Book 2 skeleton (entries seeded from biographical chapters) |
 | `tests/test-extract.js` | **Create** | Validates `book.json` and `context.json` schema on every run |
 
 ---
 
-## Task 0: Install Anthropic SDK
+## Task 0: Verify toolchain
 
-**Files:** `package.json`
+**Files:** `package.json`, `package-lock.json`
 
-- [ ] **Step 0.1: Install SDK**
-
-```bash
-cd C:\audio_book && npm install @anthropic-ai/sdk
-```
-
-Expected: `node_modules/@anthropic-ai/sdk` appears. `package.json` updated with dependency.
-
-- [ ] **Step 0.2: Verify Node version**
+- [ ] **Step 0.1: Verify Node**
 
 ```bash
 node --version
 ```
 
-Expected: `v18.x.x` or higher. If lower, stop and upgrade Node before continuing.
+Expected: `v18.x.x` or higher.
 
-- [ ] **Step 0.3: Commit**
+- [ ] **Step 0.2: Install dependencies**
+
+```bash
+cd C:\audio_book && npm install
+```
+
+Expected: `jsdom` available for `extract.js`; no third-party text-generation SDK in `package.json`.
+
+- [ ] **Step 0.3: Commit** (when lockfile changes)
 
 ```bash
 git add package.json package-lock.json
-git commit -m "chore: add anthropic sdk for view generation"
+git commit -m "chore: Node dependencies for extraction"
 ```
 
 ---
@@ -475,140 +477,29 @@ git commit -m "feat: rewrite extract.js for v2 schema — letter detection + con
 
 ---
 
-## Task 2: Generate Format Views (Anthropic API)
+## Task 2: Letter views (outside the repository)
 
 **Files:**
-- Create: `C:\audio_book\generate-views.js`
+- Create (optional): `C:\audio_book\fill-views-from-original.js`
+- Human or external workflow: `book.json` → `views.modern_french`, `views.literal_english_old`, `views.literal_english_modern`, `views.plain_english`
 
-This script reads `book.json`, iterates over complete letters, and for each letter calls the Claude API to generate the 4 remaining text views. It writes results back to `book.json` after each batch of 10 letters so progress is saved if the script is interrupted.
+Production-quality French and English variants are **authored outside the repo**. The optional script only copies `original_french` into **null** fields so the app and tests do not see missing strings during integration.
 
-**Prerequisite:** Set `ANTHROPIC_API_KEY` in your environment.
+- [ ] **Step 2.1: Implement `fill-views-from-original.js`**
 
-- [ ] **Step 2.1: Set API key**
+Implement the behaviour in the repo root file of the same name: read `book.json`, for each **complete** letter set any null `modern_french` / `literal_*` / `plain_english` from `original_french`, write `book.json` back.
 
-```bash
-# Windows — run in the terminal session before executing the script
-set ANTHROPIC_API_KEY=your_key_here
-```
-
-Or add to a `.env` file (do NOT commit this file):
-```
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
-Add `.env` to `.gitignore`:
-```bash
-echo ".env" >> .gitignore
-```
-
-- [ ] **Step 2.2: Write generate-views.js**
-
-```js
-// generate-views.js — Node.js 18+, run from C:\audio_book\
-// Usage: node generate-views.js
-// Reads: book.json  Writes: book.json (in place, batched)
-// Requires: ANTHROPIC_API_KEY env var
-
-import { readFileSync, writeFileSync } from 'fs';
-import Anthropic from '@anthropic-ai/sdk';
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const book = JSON.parse(readFileSync('book.json', 'utf8'));
-
-const BATCH_SIZE = 10;
-const letters = book.letters.filter(l => l.complete && !l.views.plain_english);
-
-console.log(`Generating views for ${letters.length} letters...`);
-
-const SYSTEM = `You are a scholarly translator working on the letters of Isabelle de Bourbon-Parma (1741–1763), an Austrian archduchess who wrote predominantly in French. You produce accurate, nuanced translations that preserve the emotional and historical character of her writing.`;
-
-async function generateViews(letter) {
-  const original = letter.views.original_french;
-
-  const prompt = `Here is a letter by Isabelle de Bourbon-Parma in its original French:
-
----
-${original}
----
-
-Produce exactly four versions. Return them as a JSON object with these exact keys:
-{
-  "modern_french": "...",
-  "literal_english_old": "...",
-  "literal_english_modern": "...",
-  "plain_english": "..."
-}
-
-Rules:
-- modern_french: Rewrite in clear, contemporary French while preserving tone and content. Keep proper nouns unchanged.
-- literal_english_old: A word-for-word English translation of the original French. Preserve archaic grammar. It may read awkwardly — that is correct.
-- literal_english_modern: A word-for-word English translation of the modern_french version. It may also read somewhat awkwardly.
-- plain_english: A natural, readable English version for modern general readers. Preserve the emotional truth and voice. No footnotes, no brackets.
-
-Return ONLY the JSON object. No markdown, no explanation.`;
-
-  const msg = await client.messages.create({
-    model: 'claude-opus-4-6',
-    max_tokens: 2048,
-    system: SYSTEM,
-    messages: [{ role: 'user', content: prompt }]
-  });
-
-  const raw = msg.content[0].text.trim();
-  // Strip markdown code fences if present
-  const jsonStr = raw.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '');
-  return JSON.parse(jsonStr);
-}
-
-async function run() {
-  let processed = 0;
-  for (let i = 0; i < letters.length; i += BATCH_SIZE) {
-    const batch = letters.slice(i, i + BATCH_SIZE);
-    await Promise.all(batch.map(async (letter) => {
-      try {
-        const views = await generateViews(letter);
-        // Find and update the letter in book.letters
-        const target = book.letters.find(l => l.id === letter.id);
-        if (target) {
-          target.views.modern_french = views.modern_french;
-          target.views.literal_english_old = views.literal_english_old;
-          target.views.literal_english_modern = views.literal_english_modern;
-          target.views.plain_english = views.plain_english;
-        }
-        processed++;
-        process.stdout.write(`\r  ${processed}/${letters.length} complete`);
-      } catch (err) {
-        console.error(`\n✗ Failed for ${letter.id}: ${err.message}`);
-        // Leave views as null — script is resumable
-      }
-    }));
-    // Save progress after each batch
-    writeFileSync('book.json', JSON.stringify(book, null, 2), 'utf8');
-    console.log(`\n  Batch saved (${Math.min(i + BATCH_SIZE, letters.length)}/${letters.length})`);
-  }
-  const remaining = book.letters.filter(l => l.complete && !l.views.plain_english).length;
-  console.log(`\n✓ Done. ${processed} letters updated. ${remaining} still missing views (re-run to retry).`);
-}
-
-run().catch(err => { console.error(err); process.exit(1); });
-```
-
-- [ ] **Step 2.3: Run generate-views.js**
+- [ ] **Step 2.2: Run optional propagation**
 
 ```bash
-cd C:\audio_book && node generate-views.js
+cd C:\audio_book && node fill-views-from-original.js
 ```
 
-This will take several minutes depending on letter count. Progress is saved every 10 letters — if interrupted, re-run and it will skip already-generated letters.
+- [ ] **Step 2.3: Editorial pass**
 
-Expected final output:
-```
-✓ Done. N letters updated. 0 still missing views (re-run to retry).
-```
+Replace duplicated source text with real translations and paraphrases using your chosen toolchain, then save `book.json`. Re-run **`fill-views-from-original.js`** only to fill gaps; it does not overwrite non-null fields.
 
-If `remaining > 0`, re-run the script once. If failures persist, inspect the specific letter IDs printed in error lines — the `original_french` text may be malformed for those letters.
-
-- [ ] **Step 2.4: Validate views were written**
+- [ ] **Step 2.4: Validate views**
 
 ```bash
 node -e "
@@ -621,21 +512,17 @@ node -e "
 "
 ```
 
-Expected: `Missing views: 0`
+Expected for release: `Missing views: 0`.
 
-- [ ] **Step 2.5: Spot-check 3 letters manually**
+- [ ] **Step 2.5: Spot-check**
 
-Open `book.json` and find letters at positions ~10, ~80, ~150. For each:
-- Verify `modern_french` is readable modern French
-- Verify `plain_english` reads naturally in English
-- Verify `literal_english_old` is obviously more awkward/archaic than `plain_english`
-- Verify none of the views contain JSON artifacts or error text
+Open `book.json` at several letter indices; confirm each view matches your editorial standard.
 
 - [ ] **Step 2.6: Commit**
 
 ```bash
-git add generate-views.js book.json .gitignore
-git commit -m "feat: generate all 4 format views for complete letters via Claude API"
+git add fill-views-from-original.js book.json
+git commit -m "feat: optional view propagation + editorial book.json"
 ```
 
 ---
@@ -646,127 +533,11 @@ git commit -m "feat: generate all 4 format views for complete letters via Claude
 - Create: `C:\audio_book\build-context.js`
 - Produces: `C:\audio_book\context.json`
 
-This script takes `context-seed.json` (biographical narrative chapters) and builds the initial `context.json` with typed entries (people, places, events). It also calls the Claude API to extract named entities from the biographical text and create stubs.
+This script reads `context-seed.json` (biographical narrative chapters from `extract.js`) and writes **`context.json`**: fixed seed entries (Marie-Christine, Vienna, Parma, Habsburg house, Bourbon-Parma) plus one **concept** entry per narrative chapter (slugified title, `short` from the first paragraph). **No HTTP calls.** Expand or merge entries by hand or import from an external notes system.
 
-- [ ] **Step 3.1: Write build-context.js**
+- [ ] **Step 3.1: Implement `build-context.js`**
 
-```js
-// build-context.js — Node.js 18+, run from C:\audio_book\
-// Usage: node build-context.js
-// Reads: context-seed.json   Writes: context.json
-
-import { readFileSync, writeFileSync } from 'fs';
-import Anthropic from '@anthropic-ai/sdk';
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const seed = JSON.parse(readFileSync('context-seed.json', 'utf8'));
-
-function slugify(str) {
-  return str.toLowerCase().replace(/[éèêë]/g,'e').replace(/[àâ]/g,'a')
-    .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-}
-
-const allText = seed.chapters.map(ch =>
-  ch.paragraphs.map(p => p.text).join('\n')
-).join('\n\n');
-
-async function extractEntities() {
-  const prompt = `Below is the text of a biography of Isabelle de Bourbon-Parma (1741–1763).
-
-Extract all significant named entities. Return a JSON array of objects, each with:
-{
-  "name": "Full name or title",
-  "type": "person|place|event|concept",
-  "aliases": ["alternative spellings or short names"],
-  "short": "One sentence description",
-  "chapter_hint": "which chapter this is most associated with"
-}
-
-Include: all named people, all named places, all named historical events, any key concepts (e.g. 'court etiquette').
-Exclude: Isabelle herself (she is the author), generic terms.
-Return ONLY the JSON array, no markdown.
-
-TEXT:
-${allText.slice(0, 12000)}`; // Claude context limit safety — first 12k chars
-
-  const msg = await client.messages.create({
-    model: 'claude-opus-4-6',
-    max_tokens: 4096,
-    messages: [{ role: 'user', content: prompt }]
-  });
-  const raw = msg.content[0].text.trim().replace(/^```json?\s*/i,'').replace(/\s*```$/i,'');
-  return JSON.parse(raw);
-}
-
-async function run() {
-  console.log('Extracting named entities from biographical text...');
-  let entities;
-  try {
-    entities = await extractEntities();
-    console.log(`  Found ${entities.length} entities`);
-  } catch (err) {
-    console.error('Entity extraction failed:', err.message);
-    entities = [];
-  }
-
-  // Build entries from entities
-  const entries = entities.map((entity, i) => ({
-    id: slugify(entity.name),
-    type: entity.type || 'person',
-    name: entity.name,
-    aliases: entity.aliases || [],
-    short: entity.short || '',
-    content: [],          // to be filled in Task 4
-    images: [],
-    letterRefs: [],       // to be filled in Task 4
-    relatedRefs: []
-  }));
-
-  // Deduplicate by id
-  const seen = new Set();
-  const deduped = entries.filter(e => {
-    if (seen.has(e.id)) return false;
-    seen.add(e.id);
-    return true;
-  });
-
-  // Add Marie-Christine as a guaranteed entry
-  if (!deduped.find(e => e.id === 'marie-christine')) {
-    deduped.unshift({
-      id: 'marie-christine',
-      type: 'person',
-      name: 'Marie-Christine of Austria',
-      aliases: ['Christine', 'Marie Christine', 'MC', 'Marie-Christine'],
-      short: "Isabelle's closest friend, confidante, and sister-in-law. Nearly all of Isabelle's surviving letters are addressed to her.",
-      content: [],
-      images: [],
-      letterRefs: [],
-      relatedRefs: []
-    });
-  }
-
-  // Attach narrative paragraphs as content to the most relevant entry
-  // (simple heuristic: assign each chapter's paragraphs to the entry whose name appears most in that chapter)
-  for (const ch of seed.chapters) {
-    const chText = ch.paragraphs.map(p => p.text).join(' ').toLowerCase();
-    let bestEntry = null;
-    let bestCount = 0;
-    for (const entry of deduped) {
-      const count = (chText.match(new RegExp(slugify(entry.name).replace(/-/g,'[\\s-]'), 'gi')) || []).length;
-      if (count > bestCount) { bestCount = count; bestEntry = entry; }
-    }
-    if (bestEntry && bestCount >= 2) {
-      bestEntry.content.push(...ch.paragraphs.map(p => ({ id: `${bestEntry.id}-${p.id}`, text: p.text })));
-    }
-  }
-
-  const context = { schema_version: 2, entries: deduped };
-  writeFileSync('context.json', JSON.stringify(context, null, 2), 'utf8');
-  console.log(`✓ context.json: ${deduped.length} entries`);
-}
-
-run().catch(err => { console.error(err); process.exit(1); });
-```
+Match the repo’s implementation: `slugify`, merge `OFFLINE_SEED_ENTITIES`, append chapter entries (skip id collisions), ensure `marie-christine` exists, write `{ schema_version: 2, entries }`.
 
 - [ ] **Step 3.2: Run build-context.js**
 
@@ -774,12 +545,7 @@ run().catch(err => { console.error(err); process.exit(1); });
 cd C:\audio_book && node build-context.js
 ```
 
-Expected:
-```
-Extracting named entities from biographical text...
-  Found ~30-60 entities
-✓ context.json: N entries
-```
+Expected: `✓ context.json: N entries` (N ≥ 10 with a typical seed).
 
 - [ ] **Step 3.3: Validate context.json**
 
@@ -787,22 +553,20 @@ Extracting named entities from biographical text...
 node -e "
   const c = JSON.parse(require('fs').readFileSync('context.json','utf8'));
   console.log('Entries:', c.entries.length);
-  const people = c.entries.filter(e => e.type === 'person').length;
-  const places = c.entries.filter(e => e.type === 'place').length;
-  const events = c.entries.filter(e => e.type === 'event').length;
-  console.log('People:', people, '  Places:', places, '  Events:', events);
   const mcEntry = c.entries.find(e => e.id === 'marie-christine');
   console.log('Marie-Christine present:', !!mcEntry);
 "
 ```
 
-Expected: At least 10 people entries, Marie-Christine present.
+- [ ] **Step 3.4: Enrich by hand (optional)**
 
-- [ ] **Step 3.4: Commit**
+Add `aliases`, `content` paragraphs, and `relatedRefs` per the v2 design spec; source prose from your editorial process outside the repo.
+
+- [ ] **Step 3.5: Commit**
 
 ```bash
 git add build-context.js context.json context-seed.json
-git commit -m "feat: build initial context.json with entity extraction"
+git commit -m "feat: build context.json from narrative seed (offline)"
 ```
 
 ---

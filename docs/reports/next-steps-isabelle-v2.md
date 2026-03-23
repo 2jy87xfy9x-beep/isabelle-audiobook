@@ -8,12 +8,46 @@
 
 ---
 
+## Considerations (branch, serve, local tree)
+
+<details>
+<summary><strong>Expand: Are you on the right branch? Why the app might still misbehave</strong></summary>
+
+### Branch
+
+In **`C:\audio_book`**, you are on **`feature/isabelle-v2-content-and-app`** (not **`main`**).
+
+Latest commit (verify with `git log -1 --oneline`): **`d7d5347`** — *docs: move next-steps to docs/reports and fix relative links*.
+
+- If “correct” means the Isabelle v2 feature work, you are on the branch that matches that.
+- If you expected the stable **`main`** line only, you are not on `main`.
+
+### Which folder `serve` uses
+
+`npx serve .` serves **the current directory** of that terminal. If another window is **`next-step`**, **`single-sh`**, or a different clone, that is a **different** tree than `C:\audio_book`, even if the UI looks similar.
+
+### Local working tree
+
+`git status` may show many modified and untracked files (`index.html`, `js/app.js`, deleted `generate-views.js`, etc.). What you see in the browser is **this working tree**, not necessarily a clean snapshot of the branch tip.
+
+### “Nothing works” vs. what loads
+
+If letter text and view tabs render, the static shell is working. If **playback, translate, save**, or similar fail, those are more likely **JavaScript/runtime or data** issues than “wrong branch” alone.
+
+**Practical check:** In the terminal where you run `serve`, confirm **`cd`** is your intended repo root (e.g. `C:\audio_book`) and **`git branch --show-current`** matches the branch you expect.
+
+</details>
+
+---
+
 ## Table of contents
 
 | Area | Jump |
 |------|------|
+| Debugging | [Considerations (branch, serve, local tree)](#considerations-branch-serve-local-tree) |
+| Implementation | [Implementation snapshot](#implementation-snapshot) |
 | Overview | [§1 Priority overview](#1-priority-overview) |
-| Content & data | [§2 Regenerate book and context with API](#2-regenerate-book-and-context-with-api) |
+| Content & data | [§2 Book and context pipeline (no embedded APIs)](#2-book-and-context-pipeline-no-embedded-apis) |
 | Quality & extraction | [§3 Improve letter and context quality](#3-improve-letter-and-context-quality) |
 | App verification | [§4 Manual QA in the browser](#4-manual-qa-in-the-browser) |
 | GitHub Pages & save | [§5 Deploy and GitHub sync](#5-deploy-and-github-sync) |
@@ -23,11 +57,70 @@
 
 ---
 
+## Implementation snapshot
+
+<details>
+<summary><strong>Expand: What’s implemented (pipeline + app)</strong></summary>
+
+**Authoritative write-up:** [Implementation report (2026-03-23)](2026-03-23-isabelle-v2-implementation-report.md).
+
+**Content pipeline (Plan A)**
+
+- **`extract.js`** — `Isabelle.html` → `book.json` + `context-seed.json` (jsdom; letter boundaries via `Letter N` markers; chapter/narrative seed).
+- **`fill-views-from-original.js`** — Optional: copy `original_french` into null view fields until editorial text exists.
+- **`build-context.js`** — Offline build of **`context.json`** from seed + fixed stubs.
+- **`map-refs.js`** — Alias-driven **`contextRefs`** / **`letterRefs`**.
+- **Verification:** `node --test tests/test-extract.js` (and full suite listed in [§8.1](#81-one-line-reference)).
+
+**Reader app (Plan B)**
+
+- **`index.html`** — Shell, layout CSS, bottom bar, overlays.
+- **`js/`** — `loader.js`, `renderer.js`, `player.js`, `progress.js`, `github.js`, `focusMode.js`, `sync.js`, `smartFeatures.js` (14 toggles), `exporter.js`, `editor.js`, `app.js` (wiring).
+- **`resolvePosition`** — Default `letter_id` when no saved position (`letter-001`).
+- **`github.js`** — Contents API helpers; `getConfig()` null when `window` is undefined (Node tests).
+
+**Layout & browser behavior (post-report polish)**
+
+- Document **`translate="no"`** + **`notranslate`** meta so Edge/Chrome do not auto-prompt “Translate this page”; a **Translate** control sends visible letter text to Google Translate in a new tab.
+- **Resizable** sidebar and context panel (drag gutters); widths stored in `localStorage` (`isabelle-v2-sidebar-w`, `isabelle-v2-context-w`).
+- **Collapsible** bottom bar (**▽** + **Shift+H** + thin pull strip when hidden); state in `isabelle-v2-bottom-collapsed`. Collapse uses flex-safe CSS (`min-height: 0`, collapsed `flex: 0 0 0`, `max-height: 0`) so the bar actually disappears in a column flex layout.
+- **Sidebar chrome:** header row with **⟨** (`#btn-sidebar-collapse`) hides the letter list on desktop; when the sidebar is collapsed, a **10px accent strip** (`#sidebar-reveal`, left edge of `#app`) restores it. **Mobile (≤767px):** only the **`.open`** class slides the drawer; **`.collapsed` no longer forces width 0** on the fixed sidebar so it does not fight the drawer.
+- **Bottom bar height:** drag handle on the top edge of the bar (`#bottom-bar-resize`); CSS variable **`--bottom-bar-max-h`** (default 400px) caps **`.bar-row`** scroll height; persisted as **`isabelle-v2-bottom-bar-max-h`**. **↑/↓** on the focused handle nudges height; **Enter** clears the override.
+- **TTS voice dropdowns** (`#letter-voice-select`, `#context-voice-select`): Chromium often returns an empty `speechSynthesis.getVoices()` list until late; **`populateVoiceSelectors()`** in **`js/app.js`** shows **“Loading voices…”**, listens for **`voiceschanged`**, and **retries at 0 / 80 / 250 / 700 / 2000 ms**. Saved URIs in **`isabelle-v2-letter-voice`** / **`isabelle-v2-context-voice`**; **`change`** handlers bound once via **`addEventListener`**.
+- **Tooltips:** bottom bar (and pull strip / sidebar reveal / sidebar collapse) use **`data-tip`** + **`::before`/`::after`** in **`index.html`** (themed bubble, **`pointer-events: none`** on pseudos). Voice **`<select>`** elements sit in **`.bar-tip-wrap-select`** spans so the tip can anchor on hover/focus.
+- **Bottom bar click-through fix:** **`#op-feedback`** and **`#undo-nav`** are **`position: fixed`** and were moved **out of `#bottom-bar`** (they are now body siblings between the bar and **`#pull-strip`**). Keeping them inside a parent with **`overflow-y: auto`** made fixed positioning relative to the scrollport and could block hits on the toolbar. Scrolling now applies to **`.bar-row`** only; **`#bottom-bar`** uses **`overflow: visible`** and **`z-index: 30`**.
+- **Thinner** scrollbars on letter, nav, and context panes.
+- Exported HTML from **`exporter.js`** uses the same **notranslate** hints.
+
+<details>
+<summary><strong>Expand: File-level map for the above UI</strong></summary>
+
+| Area | Where |
+|------|--------|
+| Shell, layout CSS, bottom bar DOM, tooltip rules, sidebar head / reveal strip | `index.html` |
+| `populateVoiceSelectors`, retries, `initBottomBarResize`, `toggleSidebar` / `closeSidebar` / `openSidebar` / `syncSidebarRevealFocus`, `isMobileLayout`, optional chaining on sidebar nodes | `js/app.js` |
+| TTS playback, `autoSelectVoices`, `setLetterVoice` / `setContextVoice` | `js/player.js` |
+
+</details>
+
+**Local run**
+
+```powershell
+cd C:\audio_book
+npx serve . -p 8080
+```
+
+Open the URL the CLI prints (another port if 8080 is in use).
+
+</details>
+
+---
+
 ## 1. Priority overview
 
 Do these in order if you want production-quality text and a shippable site.
 
-1. **Set API credentials** and re-run content scripts ([§2](#2-regenerate-book-and-context-with-api)).
+1. **Run the content pipeline** and replace placeholder view text with editorial output ([§2](#2-book-and-context-pipeline-no-embedded-apis)).
 2. **Run the manual browser checklist** ([§4](#4-manual-qa-in-the-browser)).
 3. **Configure GitHub Pages** and PAT for save ([§5](#5-deploy-and-github-sync)).
 4. **Track remaining spec polish** as you discover issues ([§7](#7-spec-gaps-and-polish)).
@@ -37,7 +130,7 @@ Do these in order if you want production-quality text and a shippable site.
 
 | If you skip… | Risk |
 |--------------|------|
-| API regeneration | All “translations” may be identical copies of noisy source text; readers see no real `plain_english` / French variants. |
+| Skipping editorial views | `fill-views-from-original.js` only duplicates `original_french`; readers never see distinct modern French or plain English until you author them externally. |
 | `map-refs.js` after new context | Stale or empty `contextRefs` / `letterRefs`; context panel and narrator “both” mode underuse Book 2. |
 | Browser QA | Speech synthesis, mobile layout, export download, and keyboard flows may fail only in real Chrome/Edge. |
 | GitHub config | Save button errors; `getConfig()` expects `*.github.io` hostname + token ([§5.2](#52-github-save-and-localhost)). |
@@ -46,58 +139,34 @@ Do these in order if you want production-quality text and a shippable site.
 
 ---
 
-## 2. Regenerate book and context with API
+## 2. Book and context pipeline (no embedded APIs)
 
-Goal: Replace offline copies with Claude-generated views and richer `context.json`, then refresh cross-references.
+Goal: Rebuild `book.json` / `context-seed.json` from HTML when the manuscript changes, optionally propagate placeholder view text, rebuild **`context.json`** offline, refresh cross-references, then **author real translations and Book 2 prose outside the repo** (any editor or toolchain you use) and commit the updated JSON.
 
 <details>
 <summary><strong>2.1 Prerequisites</strong></summary>
 
 - **Node.js 18+** — verify: `node --version`
 - **Working directory:** `C:\audio_book` (or your clone root)
-- **Anthropic API key** — create at [Anthropic Console](https://console.anthropic.com/) (account required)
-- **Optional:** `ANTHROPIC_MODEL` if your org uses a fixed model id (default in repo: `claude-sonnet-4-20250514`)
+- **Dependencies:** `npm install` (provides `jsdom` for `extract.js`)
+
+This repository does **not** read API keys for text generation; there is nothing to configure for “remote models.”
 
 </details>
 
 <details>
-<summary><strong>2.2 Set environment variables (Windows)</strong></summary>
-
-**Session only (PowerShell):**
-
-```powershell
-cd C:\audio_book
-$env:ANTHROPIC_API_KEY = "sk-ant-api03-..."
-# optional:
-$env:ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
-```
-
-**Persistent `.env` (not committed — already in `.gitignore`):**
-
-Create `C:\audio_book\.env`:
-
-```env
-ANTHROPIC_API_KEY=sk-ant-api03-...
-# ANTHROPIC_MODEL=claude-sonnet-4-20250514
-```
-
-Scripts `generate-views.js` and `build-context.js` load `.env` if present (simple `ANTHROPIC_API_KEY=` line parser).
-
-</details>
-
-<details>
-<summary><strong>2.3 Run pipeline (full sequence)</strong></summary>
+<summary><strong>2.2 Run pipeline (full sequence)</strong></summary>
 
 ```powershell
 cd C:\audio_book
 
-# If HTML changed — rebuild book + seed only:
+# If Isabelle.html changed — rebuild book + narrative seed:
 node extract.js
 
-# Generate 4 views per complete letter (batched writes to book.json):
-node generate-views.js
+# Optional: copy original_french into any still-null view fields (prototyping only):
+node fill-views-from-original.js
 
-# Rebuild context entries from seed + API entity extraction:
+# Build context.json from context-seed.json + fixed stubs (offline):
 node build-context.js
 
 # Re-scan aliases → contextRefs / letterRefs:
@@ -107,23 +176,21 @@ node map-refs.js
 node --test tests/test-extract.js
 ```
 
-**Expected:** `tests/test-extract.js` exits 0; no complete letter missing `plain_english`; cross-reference tests pass.
+**Expected:** `tests/test-extract.js` exits 0; no complete letter missing `plain_english` after propagation or hand edit; cross-reference tests pass.
 
-**Resumability:** `generate-views.js` skips letters that already have `plain_english`. If the run stops mid-batch, re-run the same command.
-
-**Cost note:** 82+ complete letters × one API call each (plus `build-context.js`) will incur API usage; monitor usage in the Anthropic console.
+**Outside-repo work:** Replace duplicated `views.*` strings with human translations; expand `context.json` entries (`content`, `aliases`, `relatedRefs`). Re-run **`node map-refs.js`** after alias or entry changes so `letterRefs` stay aligned.
 
 </details>
 
 <details>
-<summary><strong>2.4 When things fail</strong></summary>
+<summary><strong>2.3 When things fail</strong></summary>
 
 | Symptom | What to check |
 |---------|----------------|
-| `ANTHROPIC_API_KEY not set` | Env var or `.env` line; restart terminal after editing system env. |
-| JSON parse error in `generate-views.js` | Model returned markdown fences or prose; re-run for failed IDs or tighten the prompt in `generate-views.js`. |
-| `401` / `403` from API | Key validity, billing, model access. |
+| `Cannot find module 'jsdom'` | Run `npm install` from repo root. |
+| Tests fail after `extract.js` | Letter detection or HTML structure changed — adjust `extract.js`, re-run pipeline. |
 | Tests fail after `map-refs.js` | A `contextRefs` id not in `context.json` — fix entries or aliases in `map-refs.js` (min alias length 4). |
+| `plain_english` still source noise | Expected until editorial pass; `fill-views-from-original.js` does not create new wording. |
 
 </details>
 
@@ -147,16 +214,16 @@ Current logic (summary):
 - Map **page numbers** from page-marker `<div>` elements into `letter.page` (currently often `null`).
 - Add **recipient** diversity if letters to non–Marie-Christine appear in HTML with different headings.
 
-After any `extract.js` change: `node extract.js` → regenerate views → `map-refs.js` → run tests.
+After any `extract.js` change: `node extract.js` → optional `fill-views-from-original.js` → hand-edit or import views → `build-context.js` → `map-refs.js` → run tests.
 
 </details>
 
 <details>
 <summary><strong>3.2 Context (`build-context.js`) — Book 2 depth</strong></summary>
 
-Offline mode produced **stub** entries (places, concepts, chapter titles). With the API:
+The script produces **stub** entries (places, concepts, chapter titles). Editorial next steps:
 
-- Review **`context.json`** for duplicate `id` values after slugify (`build-context.js` dedupes).
+- Review **`context.json`** for duplicate `id` values after slugify (`build-context.js` skips collisions).
 - Fill **`content`** paragraphs for key people (Marie-Christine, Joseph II, etc.) per [design spec](../superpowers/specs/2026-03-23-isabelle-v2-design.md).
 - Add **`aliases`** that actually appear in letter text so `map-refs.js` and the in-app renderer agree.
 - Add **`relatedRefs`** for cross-links in the context panel.
@@ -202,10 +269,13 @@ Use **Chrome or Edge** (Web Speech API behavior matches the spec targets).
 - [ ] Switching tabs changes visible text; **per-letter view** persists after reload (`localStorage` keys `isabelle-v2-view-memory-*`).
 - [ ] **Previous / next** letter buttons and **← / →** keys (when not in an input) change letters.
 - [ ] **▶ / ⏸** speaks text; **speed** slider affects rate; **♪** cycles narrator modes (`letters` / `context` / `both` / `silent`).
+- [ ] **Letter / context voice** dropdowns list system voices (may show “Loading voices…” briefly); changing voice affects the next utterance.
 - [ ] **📖** opens/closes context panel; clicking a **dotted underline** span opens the right entry.
 - [ ] **✦** opens smart features; count **14** switches; toggles persist after reload.
 - [ ] **↓** export: choose scope/view/format; **HTML** downloads a file; open offline to confirm self-contained output.
 - [ ] **Bottom bar** can collapse; **pull strip** restores it; **Shift+H** toggles chrome (keyboard nav feature must be on).
+- [ ] **Sidebar ⟨** hides the list; **left accent strip** (when collapsed on desktop) or **≡** restores it; no dead clicks on bottom bar icons (fixed overlays / overflow — see [Implementation snapshot](#implementation-snapshot)).
+- [ ] **Resize handle** above the bottom bar changes max height; bar row scrolls if controls wrap; **Enter** on focused handle resets height.
 
 </details>
 
@@ -351,8 +421,8 @@ Run **axe** or Lighthouse on `index.html`; verify **tab order** (sidebar → let
 | Action | Command |
 |--------|---------|
 | Extract HTML → JSON | `node extract.js` |
-| Generate views (API) | `node generate-views.js` |
-| Build context (API) | `node build-context.js` |
+| Propagate views from `original_french` | `node fill-views-from-original.js` |
+| Build context (offline) | `node build-context.js` |
 | Map refs | `node map-refs.js` |
 | All unit tests | `node --test tests/test-loader.js tests/test-renderer.js tests/test-player.js tests/test-github.js tests/test-progress.js tests/test-extract.js` |
 | Serve | `npx serve . -p 8080` |
@@ -366,8 +436,8 @@ Run **axe** or Lighthouse on `index.html`; verify **tab order** (sidebar → let
 |------|------|
 | `Isabelle.html` | Source manuscript (ensure tracked if canonical) |
 | `extract.js` | HTML → `book.json`, `context-seed.json` |
-| `generate-views.js` | API → fills `views.*` on `book.json` |
-| `build-context.js` | `context-seed.json` + API → `context.json` |
+| `fill-views-from-original.js` | Copies `original_french` into null `views.*` (optional) |
+| `build-context.js` | `context-seed.json` + stubs → `context.json` (offline) |
 | `map-refs.js` | Sync `contextRefs` / `letterRefs` |
 | `book.json` / `context.json` | Runtime data for the app |
 | `index.html` | Shell + CSS |
@@ -388,4 +458,4 @@ Run **axe** or Lighthouse on `index.html`; verify **tab order** (sidebar → let
 
 ---
 
-*Last updated: 2026-03-23. Update this file when you complete phases (e.g. strike checklist items or add dated “Done” notes).*
+*Last updated: 2026-03-23 (implementation snapshot + QA checklist: UI chrome, TTS voices, bottom bar hit-testing). Update this file when you complete phases (e.g. strike checklist items or add dated “Done” notes).*

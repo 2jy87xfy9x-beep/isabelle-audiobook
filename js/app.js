@@ -122,10 +122,11 @@ async function init() {
   );
   if (currentLetterIdx < 0) currentLetterIdx = 0;
 
+  applyLayoutFromStorage();
   buildSidebar();
-  renderCurrentLetter();
-
+  syncSidebarRevealFocus();
   document.getElementById('loading').style.display = 'none';
+  renderCurrentLetter();
 
   initPlayer();
   initProgress(() => book);
@@ -153,6 +154,10 @@ async function init() {
   sfPanel.appendChild(renderTogglePanel(document));
 
   wireControls();
+  initPanelResize();
+  initBottomBarResize();
+  initTooltipPositioning();
+  window.addEventListener('resize', syncSidebarRevealFocus);
 
   const storedMode = localStorage.getItem(LS('narrator-mode'));
   if (storedMode) {
@@ -256,7 +261,20 @@ function goToLetter(idx, { addUndo = true } = {}) {
   renderCurrentLetter();
 }
 
+function isMobileLayout() {
+  return window.matchMedia('(max-width:767px)').matches;
+}
+
 function buildSidebar() {
+  const headLbl = document.getElementById('sidebar-head-label');
+  if (headLbl) {
+    if (book.chapters?.length === 1) {
+      const t = book.chapters[0].title || '';
+      headLbl.textContent = t.length > 42 ? `${t.slice(0, 40)}…` : t || 'Letters';
+    } else {
+      headLbl.textContent = 'Letters';
+    }
+  }
   const nav = document.getElementById('sidebar-nav');
   nav.innerHTML = '';
   for (const ch of book.chapters) {
@@ -392,36 +410,58 @@ function initPlayer() {
     },
   });
 
+  const loadingOpt =
+    '<option value="" disabled selected>Loading voices…</option>';
+  let voiceChangeBound = false;
+
   function populateVoiceSelectors() {
     const voices = window.speechSynthesis.getVoices();
     const lv = localStorage.getItem(LS('letter-voice')) || '';
     const cv = localStorage.getItem(LS('context-voice')) || '';
     const esc = (s) =>
       String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const lvSel = document.getElementById('letter-voice-select');
+    const cvSel = document.getElementById('context-voice-select');
+    if (!lvSel || !cvSel) return;
+
+    if (!voices.length) {
+      lvSel.innerHTML = loadingOpt;
+      cvSel.innerHTML = loadingOpt;
+      player.autoSelectVoices();
+      return;
+    }
+
     const opts = voices
       .map((v) => `<option value="${esc(v.voiceURI)}">${esc(v.name)} (${esc(v.lang)})</option>`)
       .join('');
-    const lvSel = document.getElementById('letter-voice-select');
-    const cvSel = document.getElementById('context-voice-select');
     lvSel.innerHTML = opts;
     cvSel.innerHTML = opts;
-    if (lv) lvSel.value = lv;
-    if (cv) cvSel.value = cv;
+    player.autoSelectVoices();
+    if (lv && [...lvSel.options].some((o) => o.value === lv)) lvSel.value = lv;
+    else if (player.letterVoice) lvSel.value = player.letterVoice.voiceURI;
+    if (cv && [...cvSel.options].some((o) => o.value === cv)) cvSel.value = cv;
+    else if (player.contextVoice) cvSel.value = player.contextVoice.voiceURI;
     player.setLetterVoice(lvSel.value);
     player.setContextVoice(cvSel.value);
-    lvSel.onchange = () => {
-      player.setLetterVoice(lvSel.value);
-      localStorage.setItem(LS('letter-voice'), lvSel.value);
-    };
-    cvSel.onchange = () => {
-      player.setContextVoice(cvSel.value);
-      localStorage.setItem(LS('context-voice'), cvSel.value);
-    };
+
+    if (!voiceChangeBound) {
+      voiceChangeBound = true;
+      lvSel.addEventListener('change', () => {
+        player.setLetterVoice(lvSel.value);
+        localStorage.setItem(LS('letter-voice'), lvSel.value);
+      });
+      cvSel.addEventListener('change', () => {
+        player.setContextVoice(cvSel.value);
+        localStorage.setItem(LS('context-voice'), cvSel.value);
+      });
+    }
   }
 
-  if (window.speechSynthesis.getVoices().length) populateVoiceSelectors();
-  else player.autoSelectVoices();
+  populateVoiceSelectors();
   window.speechSynthesis.addEventListener('voiceschanged', populateVoiceSelectors);
+  [0, 80, 250, 700, 2000].forEach((ms) =>
+    setTimeout(() => populateVoiceSelectors(), ms)
+  );
 
   refreshPlayerData();
 }
@@ -461,20 +501,264 @@ function handleRangeClick(el) {
   }
 }
 
+function applyLayoutFromStorage() {
+  const app = document.getElementById('app');
+  const sw = parseInt(localStorage.getItem(LS('sidebar-w')) || '', 10);
+  const cw = parseInt(localStorage.getItem(LS('context-w')) || '', 10);
+  if (Number.isFinite(sw))
+    app.style.setProperty(
+      '--sidebar-w',
+      `${Math.max(180, Math.min(520, sw))}px`
+    );
+  if (Number.isFinite(cw))
+    app.style.setProperty(
+      '--context-w',
+      `${Math.max(200, Math.min(560, cw))}px`
+    );
+  const bottomBar = document.getElementById('bottom-bar');
+  if (localStorage.getItem(LS('bottom-collapsed')) === '1')
+    bottomBar.classList.add('collapsed');
+  const bmh = parseInt(localStorage.getItem(LS('bottom-bar-max-h')) || '', 10);
+  if (Number.isFinite(bmh))
+    bottomBar.style.setProperty(
+      '--bottom-bar-max-h',
+      `${Math.max(96, Math.min(480, bmh))}px`
+    );
+}
+
+function initPanelResize() {
+  const app = document.getElementById('app');
+  const gS = document.getElementById('gutter-sidebar');
+  const gC = document.getElementById('gutter-context');
+
+  const parsePx = (val, fallback) => {
+    const n = parseInt(String(val).trim(), 10);
+    return Number.isFinite(n) ? n : fallback;
+  };
+
+  const bind = (gutter, mode) => {
+    gutter.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      const startX = e.clientX;
+      const cs = getComputedStyle(app);
+      const startSw = parsePx(cs.getPropertyValue('--sidebar-w'), 260);
+      const startCw = parsePx(cs.getPropertyValue('--context-w'), 320);
+
+      const onMove = (ev) => {
+        const dx = ev.clientX - startX;
+        if (mode === 'sidebar') {
+          const w = Math.max(180, Math.min(520, startSw + dx));
+          app.style.setProperty('--sidebar-w', `${w}px`);
+        } else {
+          if (document.getElementById('context-pane').classList.contains('collapsed'))
+            return;
+          const w = Math.max(200, Math.min(560, startCw + dx));
+          app.style.setProperty('--context-w', `${w}px`);
+        }
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        const cs2 = getComputedStyle(app);
+        if (mode === 'sidebar') {
+          localStorage.setItem(
+            LS('sidebar-w'),
+            String(parsePx(cs2.getPropertyValue('--sidebar-w'), 260))
+          );
+        } else if (!document.getElementById('context-pane').classList.contains('collapsed')) {
+          localStorage.setItem(
+            LS('context-w'),
+            String(parsePx(cs2.getPropertyValue('--context-w'), 320))
+          );
+        }
+      };
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    gutter.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      if (mode === 'sidebar') {
+        app.style.removeProperty('--sidebar-w');
+        localStorage.removeItem(LS('sidebar-w'));
+      } else {
+        app.style.removeProperty('--context-w');
+        localStorage.removeItem(LS('context-w'));
+      }
+    });
+  };
+
+  bind(gS, 'sidebar');
+  bind(gC, 'context');
+}
+
+function initBottomBarResize() {
+  const bar = document.getElementById('bottom-bar');
+  const gutter = document.getElementById('bottom-bar-resize');
+  if (!bar || !gutter) return;
+
+  const parseMaxH = () => {
+    const v = getComputedStyle(bar).getPropertyValue('--bottom-bar-max-h').trim();
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? n : 400;
+  };
+
+  const applyH = (px) => {
+    const h = Math.max(96, Math.min(480, Math.round(px)));
+    bar.style.setProperty('--bottom-bar-max-h', `${h}px`);
+    localStorage.setItem(LS('bottom-bar-max-h'), String(h));
+  };
+
+  gutter.addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || bar.classList.contains('collapsed')) return;
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = parseMaxH();
+    const onMove = (ev) => {
+      const dy = startY - ev.clientY;
+      applyH(startH + dy);
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  gutter.addEventListener('keydown', (e) => {
+    if (bar.classList.contains('collapsed')) return;
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      applyH(parseMaxH() + 12);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      applyH(parseMaxH() - 12);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      bar.style.removeProperty('--bottom-bar-max-h');
+      localStorage.removeItem(LS('bottom-bar-max-h'));
+    }
+  });
+}
+
+function initTooltipPositioning() {
+  const sel = [
+    '#bottom-bar .bar-tip',
+    '#pull-strip.bar-tip',
+    '#sidebar-reveal.bar-tip',
+    '#sidebar .sidebar-collapse-btn.bar-tip',
+    '#bottom-bar .bar-tip-wrap-select',
+  ].join(',');
+  document.querySelectorAll(sel).forEach((el) => {
+    el.addEventListener('mouseenter', () => {
+      const r = el.getBoundingClientRect();
+      const x = Math.round(r.left + r.width / 2);
+      const bottom = Math.round(window.innerHeight - r.top + 8);
+      el.style.setProperty('--tip-x', `${x}px`);
+      el.style.setProperty('--tip-bottom', `${bottom}px`);
+      el.style.setProperty('--tip-arrow', `${bottom - 10}px`);
+    });
+  });
+}
+
+function letterPlainTextForTranslate() {
+  const root = document.getElementById('letter-content');
+  if (!root) return '';
+  const sel =
+    '.letter-salutation,.letter-paragraph,.letter-closing,.letter-meta,.view-missing';
+  const parts = [];
+  root.querySelectorAll(sel).forEach((el) => {
+    const t = el.textContent.replace(/\s+/g, ' ').trim();
+    if (t) parts.push(t);
+  });
+  return parts.join('\n\n');
+}
+
+function flashOpFeedback(msg) {
+  const el = document.getElementById('op-feedback');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('visible');
+  setTimeout(() => el.classList.remove('visible'), 2200);
+}
+
+function openLetterInGoogleTranslate() {
+  let text = letterPlainTextForTranslate();
+  if (!text) {
+    flashOpFeedback('No letter text to translate');
+    return;
+  }
+  const max = 4500;
+  if (text.length > max) {
+    text = text.slice(0, max);
+    flashOpFeedback('Long letter — opening first part in Translate');
+  }
+  const url = `https://translate.google.com/?sl=auto&tl=en&op=translate&text=${encodeURIComponent(text)}`;
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function syncSidebarRevealFocus() {
+  const r = document.getElementById('sidebar-reveal');
+  const s = document.getElementById('sidebar');
+  if (!r || !s) return;
+  if (isMobileLayout()) {
+    r.setAttribute('aria-hidden', 'true');
+    r.tabIndex = -1;
+    return;
+  }
+  const collapsed = s.classList.contains('collapsed');
+  r.setAttribute('aria-hidden', collapsed ? 'false' : 'true');
+  r.tabIndex = collapsed ? 0 : -1;
+}
+
 function closeSidebar() {
   const s = document.getElementById('sidebar');
-  s.classList.add('collapsed');
-  s.classList.remove('open');
+  if (isMobileLayout()) s.classList.remove('open');
+  else {
+    s.classList.add('collapsed');
+    s.classList.remove('open');
+  }
+  syncSidebarRevealFocus();
+}
+
+function openSidebar() {
+  const s = document.getElementById('sidebar');
+  if (isMobileLayout()) s.classList.add('open');
+  else {
+    s.classList.remove('collapsed');
+    s.classList.remove('open');
+  }
+  syncSidebarRevealFocus();
 }
 
 function toggleSidebar() {
   const s = document.getElementById('sidebar');
-  s.classList.toggle('collapsed');
-  s.classList.toggle('open');
+  if (isMobileLayout()) s.classList.toggle('open');
+  else {
+    s.classList.toggle('collapsed');
+    s.classList.remove('open');
+  }
+  syncSidebarRevealFocus();
 }
 
 function toggleChrome() {
-  document.getElementById('bottom-bar').classList.toggle('collapsed');
+  const bar = document.getElementById('bottom-bar');
+  bar.classList.toggle('collapsed');
+  localStorage.setItem(
+    LS('bottom-collapsed'),
+    bar.classList.contains('collapsed') ? '1' : '0'
+  );
 }
 
 async function saveAll() {
@@ -528,6 +812,17 @@ function wireControls() {
   document.getElementById('btn-prev').addEventListener('click', () => player.skipPrev());
   document.getElementById('btn-next').addEventListener('click', () => player.skipNext());
   document.getElementById('btn-sidebar').addEventListener('click', toggleSidebar);
+  document.getElementById('btn-sidebar-collapse')?.addEventListener('click', () => {
+    closeSidebar();
+  });
+  const sidebarReveal = document.getElementById('sidebar-reveal');
+  sidebarReveal?.addEventListener('click', () => openSidebar());
+  sidebarReveal?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openSidebar();
+    }
+  });
   document.getElementById('btn-context').addEventListener('click', toggleContextPanel);
   document.getElementById('btn-theme').addEventListener('click', () => {
     const light = document.documentElement.dataset.theme === 'light';
@@ -542,12 +837,20 @@ function wireControls() {
     if (smartPanel.classList.contains('open')) smartPanel.focus();
   });
   document.getElementById('btn-range-copy').addEventListener('click', toggleRangeMode);
-  document.getElementById('pull-strip').addEventListener('click', () =>
-    document.getElementById('bottom-bar').classList.remove('collapsed')
+  document.getElementById('btn-translate').addEventListener('click', () =>
+    openLetterInGoogleTranslate()
   );
+  document.getElementById('btn-bottom-collapse').addEventListener('click', () =>
+    toggleChrome()
+  );
+
+  const expandBar = () => {
+    document.getElementById('bottom-bar').classList.remove('collapsed');
+    localStorage.setItem(LS('bottom-collapsed'), '0');
+  };
+  document.getElementById('pull-strip').addEventListener('click', expandBar);
   document.getElementById('pull-strip').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ')
-      document.getElementById('bottom-bar').classList.remove('collapsed');
+    if (e.key === 'Enter' || e.key === ' ') expandBar();
   });
 
   document.getElementById('btn-narrator').addEventListener('click', () => {
