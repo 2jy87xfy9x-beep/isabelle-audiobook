@@ -1,42 +1,39 @@
-// js/loader.js
-// Fetches book.json and resolves cross-device position conflict.
+const LS_POSITION = 'isabelle-v2-position';
 
-export async function loadBook() {
-  const response = await fetch('./book.json');
-  if (!response.ok) {
-    throw new Error(`Failed to fetch book.json: ${response.status}`);
-  }
-  return response.json();
+export async function loadData() {
+  const [bookRes, ctxRes] = await Promise.all([
+    fetch('./book.json'),
+    fetch('./context.json'),
+  ]);
+  if (!bookRes.ok) throw new Error('book_fetch_failed');
+  const book = await bookRes.json();
+  const context = ctxRes.ok ? await ctxRes.json() : { entries: [] };
+  return { book, context };
 }
 
-/**
- * Returns the position (zero-based paragraph index) to restore.
- * Uses the value with the more recent lastPositionTimestamp.
- * Falls back to 0 if neither source has a valid position.
- */
-export function resolvePosition(bookData) {
-  const localRaw = localStorage.getItem('isabelle_position');
-  let local = null;
-  try { local = localRaw ? JSON.parse(localRaw) : null; } catch { local = null; }
-
-  const remote = {
-    position: bookData.lastPosition ?? 0,
-    timestamp: bookData.lastPositionTimestamp ?? 0
+export function resolvePosition(local, remote) {
+  const fallback = {
+    letter_id: 'letter-001',
+    paragraph_index: 0,
+    scroll_offset: 0,
+    active_view: 'plain_english',
+    timestamp: 0,
   };
-
-  if (!local) return remote.position;
-  if (local.timestamp >= remote.timestamp) return local.position;
-  return remote.position;
+  if (!local && !remote) return fallback;
+  if (!local) return remote;
+  if (!remote) return local;
+  return local.timestamp >= remote.timestamp ? local : remote;
 }
 
-export function savePositionLocal(position) {
-  localStorage.setItem('isabelle_position', JSON.stringify({
-    position,
-    timestamp: Date.now()
-  }));
+export function loadLocalPosition() {
+  try {
+    const raw = localStorage.getItem(LS_POSITION);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }
 
-export function getSavedLocal() {
-  const raw = localStorage.getItem('isabelle_position');
-  try { return raw ? JSON.parse(raw) : { position: 0, timestamp: 0 }; } catch { return { position: 0, timestamp: 0 }; }
+export function saveLocalPosition(pos) {
+  localStorage.setItem(LS_POSITION, JSON.stringify({ ...pos, timestamp: Date.now() }));
 }

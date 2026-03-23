@@ -1,13 +1,35 @@
-// tests/test-progress.js
-// We just test the width calculation logic in isolation.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
 
-function calcWidth(index, total) {
-  if (total === 0) return 0;
-  return Math.min(100, ((index + 1) / total) * 100);
-}
+const store = {};
+globalThis.localStorage = {
+  getItem: (k) => store[k] ?? null,
+  setItem: (k, v) => {
+    store[k] = v;
+  },
+  removeItem: (k) => {
+    delete store[k];
+  },
+};
 
-console.assert(calcWidth(0, 100) === 1, 'Test 1: first paragraph = 1%');
-console.assert(calcWidth(49, 100) === 50, 'Test 2: halfway');
-console.assert(calcWidth(99, 100) === 100, 'Test 3: last paragraph = 100%');
-console.assert(calcWidth(0, 0) === 0, 'Test 4: zero total');
-console.log('✓ progress tests passed');
+const { savePosition, cancelSync } = await import('../js/progress.js');
+
+test('savePosition writes to localStorage under isabelle-v2-position', () => {
+  const pos = {
+    letter_id: 'letter-005',
+    paragraph_index: 1,
+    scroll_offset: 0,
+    active_view: 'plain_english',
+    timestamp: 0,
+  };
+  savePosition(pos);
+  const raw = store['isabelle-v2-position'];
+  assert.ok(raw, 'Position not written to localStorage');
+  const parsed = JSON.parse(raw);
+  assert.equal(parsed.letter_id, 'letter-005');
+  assert.ok(parsed.timestamp > 0, 'Timestamp should be set');
+});
+
+test('cancelSync clears pending sync without throwing', () => {
+  assert.doesNotThrow(() => cancelSync());
+});

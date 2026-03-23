@@ -1,337 +1,314 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark" translate="no">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Isabelle</title>
+  <meta name="google" content="notranslate">
+  <title>Isabelle — Letters</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Pinyon+Script&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    /* ── Design tokens ── */
     :root {
-      --bg: #09060c;
-      --surf: #0f0a13;
-      --surf2: #140e18;
-      --border: rgba(198,123,165,0.14);
-      --border-hi: rgba(198,123,165,0.38);
-      --accent: #c67ba5;
-      --accent-bg: rgba(198,123,165,0.10);
-      --accent-dim: rgba(198,123,165,0.28);
-      --text: rgba(255,255,255,0.80);
-      --text-m: rgba(255,255,255,0.50);
-      --text-d: rgba(255,255,255,0.28);
-      --green: #4ade80;
-      --red: #f87171;
-      --amber: #d07846;
-      --book-font: Georgia, 'Times New Roman', serif;
-      --ui-font: 'JetBrains Mono', monospace;
-      --font-size: 16px;
+      --sidebar-w:260px; --context-w:320px;
+      --bg:#09060c; --surf:#0f0a13; --surf2:#140e18;
+      --border:rgba(198,123,165,0.14); --border-hi:rgba(198,123,165,0.38);
+      --accent:#c67ba5; --accent-bg:rgba(198,123,165,0.10); --accent-dim:rgba(198,123,165,0.28);
+      --text:rgba(255,255,255,0.82); --text-m:rgba(255,255,255,0.52); --text-d:rgba(255,255,255,0.28);
+      --book-font:Georgia,'Times New Roman',serif;
+      --ui-font:'JetBrains Mono',monospace;
+      --font-size:16px; --t:0.18s ease;
     }
     [data-theme="light"] {
-      --bg: #faf8f5;
-      --surf: #f0ede8;
-      --surf2: #e8e4de;
-      --border: rgba(120,60,90,0.14);
-      --border-hi: rgba(120,60,90,0.30);
-      --accent: #9b4f7a;
-      --accent-bg: rgba(120,60,90,0.08);
-      --accent-dim: rgba(120,60,90,0.22);
-      --text: rgba(30,20,25,0.85);
-      --text-m: rgba(30,20,25,0.55);
-      --text-d: rgba(30,20,25,0.35);
+      --bg:#faf8f5; --surf:#f0ede8; --surf2:#e8e4de;
+      --border:rgba(120,60,90,0.14); --border-hi:rgba(120,60,90,0.30);
+      --accent:#9b4f7a; --text:rgba(30,20,25,0.85); --text-m:rgba(30,20,25,0.55); --text-d:rgba(30,20,25,0.35);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{font-size:var(--font-size)}
+    :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+    body{background:var(--bg);color:var(--text);font-family:var(--ui-font);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+    #app{display:flex;flex:1;overflow:hidden;min-width:0}
+
+    #sidebar-reveal{width:0;flex-shrink:0;align-self:stretch;cursor:pointer;background:linear-gradient(90deg,var(--accent-dim),var(--accent));opacity:0;pointer-events:none;transition:width var(--t),opacity var(--t)}
+    @media(min-width:768px){
+      #app:has(#sidebar.collapsed) #sidebar-reveal{width:10px;opacity:.55;pointer-events:auto}
+      #app:has(#sidebar.collapsed) #sidebar-reveal:hover{opacity:1}
+    }
+    #sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);max-width:min(520px,45vw);background:var(--surf);border-right:1px solid var(--border);display:flex;flex-direction:column;transition:width var(--t),min-width var(--t),border-color var(--t);overflow:hidden;flex-shrink:0}
+    #sidebar.collapsed{width:0!important;min-width:0!important;max-width:0!important;border-right-color:transparent}
+    .sidebar-head{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px 8px;border-bottom:1px solid var(--border)}
+    .sidebar-head-title{font-family:var(--ui-font);font-size:.56rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+    .sidebar-collapse-btn{background:none;border:none;color:var(--text-m);cursor:pointer;font-size:1rem;line-height:1;padding:4px 6px;border-radius:4px;transition:color var(--t),background var(--t)}
+    .sidebar-collapse-btn:hover{color:var(--accent);background:var(--accent-bg)}
+    @media(max-width:767px){
+      #sidebar.collapsed{width:min(320px,85vw)!important;min-width:min(320px,85vw)!important;max-width:85vw!important}
+    }
+    #sidebar-nav{flex:1;overflow-y:auto;padding:12px 0;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+
+    .resize-gutter{width:5px;flex-shrink:0;cursor:col-resize;background:transparent;position:relative;touch-action:none}
+    .resize-gutter::after{content:'';position:absolute;inset:0 auto 0 50%;width:1px;margin-left:-1px;background:var(--border);transition:background var(--t),box-shadow var(--t)}
+    .resize-gutter:hover::after,.resize-gutter:focus-visible::after{background:var(--accent);box-shadow:0 0 0 1px var(--accent-dim)}
+    #sidebar.collapsed + .resize-gutter{display:none}
+    #main:has(#context-pane.collapsed) #gutter-context{display:none}
+    .nav-letter{display:block;width:100%;background:none;border:none;text-align:left;padding:6px 16px;color:var(--text-m);font-family:var(--book-font);font-size:.82rem;cursor:pointer;transition:color var(--t),background var(--t)}
+    .nav-letter:hover,.nav-letter.active{color:var(--text);background:var(--surf2)}
+    .nav-letter.placeholder{opacity:.4;cursor:default}
+    .nav-chapter-heading{font-family:var(--ui-font);font-size:.56rem;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);padding:16px 16px 6px}
+
+    #main{flex:1;display:flex;overflow:hidden;min-width:0}
+    #letter-pane{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;min-width:120px}
+    #letter-content{flex:1;overflow-y:auto;padding:48px 60px 40px;scrollbar-width:thin;scrollbar-color:var(--border-hi) transparent}
+
+    #context-pane{width:var(--context-w);min-width:var(--context-w);max-width:min(560px,50vw);background:var(--surf);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width var(--t),min-width var(--t),max-width var(--t),border-color var(--t);flex-shrink:0}
+    #context-pane.collapsed{width:0!important;min-width:0!important;max-width:0!important;border-left-color:transparent}
+    #context-content{flex:1;overflow-y:auto;padding:24px 20px;scrollbar-width:thin;scrollbar-color:var(--border-hi) transparent}
+
+    #letter-content::-webkit-scrollbar,#sidebar-nav::-webkit-scrollbar,#context-content::-webkit-scrollbar{width:6px;height:6px}
+    #letter-content::-webkit-scrollbar-thumb,#sidebar-nav::-webkit-scrollbar-thumb,#context-content::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:3px}
+    #letter-content::-webkit-scrollbar-track,#sidebar-nav::-webkit-scrollbar-track,#context-content::-webkit-scrollbar-track{background:transparent}
+
+    #narrator-line{position:absolute;top:0;left:0;height:2px;width:0;background:var(--accent);transition:width .3s linear;display:none}
+
+    .letter-meta{display:flex;justify-content:space-between;font-size:.72rem;color:var(--text-d);margin-bottom:24px;font-family:var(--ui-font);letter-spacing:.06em}
+    .view-switcher{display:flex;gap:20px;margin-bottom:28px;flex-wrap:wrap}
+    .view-switcher [role=tab]{background:none;border:none;font-family:var(--ui-font);font-size:.68rem;color:var(--text-d);cursor:pointer;padding:0 0 3px;transition:color var(--t)}
+    .view-switcher [role=tab].active{color:var(--accent);border-bottom:1px solid var(--accent)}
+    .letter-salutation{font-family:var(--book-font);font-size:var(--font-size);color:var(--text);margin-bottom:16px;font-style:italic}
+    .letter-paragraph{font-family:var(--book-font);font-size:var(--font-size);color:var(--text);line-height:1.82;margin-bottom:14px;max-width:640px}
+    .letter-paragraph.current{background:var(--accent-bg)}
+    .letter-paragraph.handwriting{font-family:'Pinyon Script',cursive;font-size:calc(var(--font-size) * 1.3);background:rgba(245,240,230,0.06);padding:4px 8px}
+    .letter-closing{font-family:var(--book-font);font-size:var(--font-size);color:var(--text);text-align:right;margin-top:20px;font-style:italic;max-width:640px}
+    .ctx-ref{border-bottom:1px dotted var(--accent);cursor:pointer}
+    .ctx-ref:hover{background:var(--accent-bg)}
+    .letter-nav{display:flex;justify-content:space-between;margin-top:32px;padding-top:20px;border-top:1px solid var(--border);max-width:640px}
+    .letter-nav button{background:none;border:none;color:var(--text-d);font-family:var(--ui-font);font-size:.72rem;cursor:pointer;transition:color var(--t)}
+    .letter-nav button:hover:not(:disabled){color:var(--accent)}
+    .letter-nav button:disabled{opacity:.25;cursor:default}
+    .photocopy-img{max-width:100%;background:rgba(245,240,230,0.04);display:block}
+    .photocopy-fallback{background:rgba(245,240,230,0.04);padding:24px}
+    .photocopy-notice{font-size:.72rem;color:var(--text-d);margin-bottom:16px;font-family:var(--ui-font)}
+    .view-missing{color:var(--text-d);font-family:var(--ui-font);font-size:.8rem;font-style:italic}
+
+    body.page-mode #letter-content{overflow:hidden;display:flex;scroll-snap-type:x mandatory}
+    body.page-mode .letter-page{min-width:100%;scroll-snap-align:start;padding:48px 60px 40px}
+
+    #bottom-bar{
+      --bottom-bar-max-h:400px;
+      background:var(--surf);border-top:1px solid var(--border);padding:4px 12px 6px;
+      display:flex;flex-direction:column;gap:0;flex-shrink:0;flex-grow:0;
+      min-height:0;overflow:visible;
+      position:relative;z-index:30;
+      transition:max-height .28s ease,padding var(--t),border-width var(--t),opacity .2s ease,flex-basis .28s ease
+    }
+    #bottom-bar.collapsed{
+      flex:0 0 0;max-height:0!important;min-height:0!important;padding:0;border-top-width:0;
+      overflow:hidden;opacity:0;pointer-events:none
+    }
+    #bottom-bar.collapsed .bar-row{max-height:0!important;min-height:0!important;overflow:hidden;padding:0;margin:0}
+    .bottom-bar-resize-gutter{
+      height:5px;flex-shrink:0;margin:0 -12px 4px -12px;cursor:row-resize;touch-action:none;
+      background:transparent;position:relative
+    }
+    .bottom-bar-resize-gutter::after{
+      content:'';position:absolute;left:20%;right:20%;top:50%;height:2px;margin-top:-1px;
+      border-radius:2px;background:var(--border);transition:background var(--t),box-shadow var(--t)
+    }
+    .bottom-bar-resize-gutter:hover::after,.bottom-bar-resize-gutter:focus-visible::after{
+      background:var(--accent);box-shadow:0 0 0 1px var(--accent-dim)
+    }
+    #bottom-bar.collapsed .bottom-bar-resize-gutter{display:none}
+    .bar-row{
+      display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+      max-height:var(--bottom-bar-max-h);min-height:0;overflow-x:hidden;overflow-y:auto;
+      flex:0 1 auto
+    }
+    .bar-icon{background:none;border:none;color:var(--text-m);cursor:pointer;font-size:.88rem;padding:2px 4px;transition:color var(--t);line-height:1;min-width:32px;min-height:32px;display:flex;align-items:center;justify-content:center}
+    .bar-icon.bar-collapse{margin-left:auto;font-size:.72rem;opacity:.85}
+    .bar-text-btn{font-family:var(--ui-font);font-size:.58rem;letter-spacing:.04em;text-transform:uppercase;color:var(--text-m);background:var(--surf2);border:1px solid var(--border);padding:5px 10px;cursor:pointer;transition:color var(--t),border-color var(--t),background var(--t)}
+    .bar-text-btn:hover{color:var(--text);border-color:var(--accent);background:var(--accent-bg)}
+    .bar-icon:hover,.bar-icon.active{color:var(--accent)}
+    .speed-slider{width:80px;accent-color:var(--accent)}
+    .speed-label{font-size:.68rem;color:var(--text-d);min-width:28px}
+    #bottom-bar .bar-tip-speed{gap:6px}
+    #bottom-bar .bar-tip,#pull-strip.bar-tip,#sidebar-reveal.bar-tip,#sidebar .sidebar-collapse-btn.bar-tip{position:relative;display:inline-flex;align-items:center;vertical-align:middle}
+    #pull-strip.bar-tip,#sidebar-reveal.bar-tip{display:block}
+    #bottom-bar .bar-tip::before,#pull-strip.bar-tip::before,#sidebar-reveal.bar-tip::before,#sidebar .sidebar-collapse-btn.bar-tip::before{
+      content:attr(data-tip);
+      position:fixed;left:var(--tip-x,-9999px);bottom:var(--tip-bottom,60px);transform:translateX(-50%);
+      padding:4px 8px;max-width:min(200px,55vw);width:max-content;text-align:center;white-space:normal;
+      font-family:var(--ui-font);font-size:.63rem;line-height:1.3;font-weight:500;letter-spacing:.02em;
+      color:var(--text);background:var(--surf2);border:1px solid var(--border-hi);
+      border-radius:5px;box-shadow:0 3px 10px rgba(0,0,0,.3);
+      opacity:0;visibility:hidden;pointer-events:none;z-index:200
+    }
+    #bottom-bar .bar-tip::after,#pull-strip.bar-tip::after,#sidebar-reveal.bar-tip::after,#sidebar .sidebar-collapse-btn.bar-tip::after{
+      content:'';position:fixed;left:var(--tip-x,-9999px);bottom:var(--tip-arrow,48px);transform:translateX(-50%);
+      border:5px solid transparent;border-top-color:var(--border-hi);
+      opacity:0;visibility:hidden;pointer-events:none;z-index:201
+    }
+    #bottom-bar .bar-tip:hover::before,#bottom-bar .bar-tip:hover::after,
+    #pull-strip.bar-tip:hover::before,#pull-strip.bar-tip:hover::after,
+    #sidebar-reveal.bar-tip:hover::before,#sidebar-reveal.bar-tip:hover::after,
+    #sidebar .sidebar-collapse-btn.bar-tip:hover::before,#sidebar .sidebar-collapse-btn.bar-tip:hover::after,
+    #bottom-bar .bar-tip:focus-within::before,#bottom-bar .bar-tip:focus-within::after,
+    #pull-strip.bar-tip:focus-visible::before,#pull-strip.bar-tip:focus-visible::after,
+    #sidebar-reveal.bar-tip:focus-visible::before,#sidebar-reveal.bar-tip:focus-visible::after,
+    #sidebar .sidebar-collapse-btn.bar-tip:focus-visible::before,#sidebar .sidebar-collapse-btn.bar-tip:focus-visible::after,
+    #bottom-bar button.bar-tip:focus-visible::before,#bottom-bar button.bar-tip:focus-visible::after{
+      opacity:1;visibility:visible
+    }
+    #bottom-bar .bar-tip-wrap-select{display:inline-flex;align-items:center;position:relative;vertical-align:middle}
+    #bottom-bar .bar-tip-wrap-select::before{
+      content:attr(data-tip);
+      position:fixed;left:var(--tip-x,-9999px);bottom:var(--tip-bottom,60px);transform:translateX(-50%);
+      padding:4px 8px;max-width:min(200px,55vw);width:max-content;text-align:center;white-space:normal;
+      font-family:var(--ui-font);font-size:.63rem;line-height:1.3;font-weight:500;letter-spacing:.02em;
+      color:var(--text);background:var(--surf2);border:1px solid var(--border-hi);
+      border-radius:5px;box-shadow:0 3px 10px rgba(0,0,0,.3);
+      opacity:0;visibility:hidden;pointer-events:none;z-index:200
+    }
+    #bottom-bar .bar-tip-wrap-select::after{
+      content:'';position:fixed;left:var(--tip-x,-9999px);bottom:var(--tip-arrow,48px);transform:translateX(-50%);
+      border:5px solid transparent;border-top-color:var(--border-hi);
+      opacity:0;visibility:hidden;pointer-events:none;z-index:201
+    }
+    #bottom-bar .bar-tip-wrap-select:hover::before,#bottom-bar .bar-tip-wrap-select:hover::after,
+    #bottom-bar .bar-tip-wrap-select:focus-within::before,#bottom-bar .bar-tip-wrap-select:focus-within::after{
+      opacity:1;visibility:visible
+    }
+    .pull-strip{display:none;height:4px;background:linear-gradient(180deg,var(--accent-dim),var(--accent));cursor:pointer;opacity:.55;flex-shrink:0;transition:opacity var(--t)}
+    .pull-strip:hover{opacity:1}
+    #bottom-bar.collapsed ~ .pull-strip{display:block}
+
+    #smart-features-panel{position:fixed;bottom:52px;right:20px;background:var(--surf);border:1px solid var(--border);padding:16px 20px;z-index:50;display:none;min-width:220px;max-height:70vh;overflow-y:auto}
+    #smart-features-panel.open{display:block}
+    .sf-row{display:flex;align-items:center;gap:10px;padding:5px 0;cursor:pointer}
+    .sf-toggle{width:32px;height:18px;background:var(--surf2);border:1px solid var(--border);border-radius:9px;cursor:pointer;position:relative;transition:background var(--t)}
+    .sf-toggle.on{background:var(--accent-dim)}
+
+    #export-panel{position:fixed;bottom:52px;left:50%;transform:translateX(-50%);background:var(--surf);border:1px solid var(--border);padding:20px 24px;z-index:50;display:none;min-width:280px}
+    #export-panel.open{display:block}
+    .export-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    .export-btn{background:none;border:1px solid var(--border);color:var(--text-m);font-family:var(--ui-font);font-size:.62rem;padding:5px 10px;cursor:pointer;transition:all var(--t)}
+    .export-btn.active,.export-btn:hover{background:var(--accent-dim);color:var(--text);border-color:var(--accent)}
+
+    #inline-toolbar{position:fixed;display:none;gap:6px;background:var(--surf);border:1px solid var(--border);padding:6px 10px;z-index:60}
+    #inline-toolbar button{background:none;border:none;color:var(--text-m);cursor:pointer;font-family:var(--ui-font);font-size:.78rem;padding:3px 6px;transition:color var(--t)}
+    #inline-toolbar button:hover{color:var(--accent)}
+
+    #op-feedback{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);font-family:var(--ui-font);font-size:.62rem;color:var(--text-d);opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
+    #op-feedback.visible{opacity:1}
+    #undo-nav{position:fixed;bottom:64px;right:20px;background:var(--surf);border:1px solid var(--border);color:var(--text-m);font-family:var(--ui-font);font-size:.62rem;padding:6px 12px;cursor:pointer;display:none;z-index:50}
+    #undo-nav.visible{display:block}
+
+    #ctx-sync-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block;opacity:0;margin-left:6px}
+    #ctx-sync-dot.pulse{animation:dot-pulse .4s ease forwards}
+    @keyframes dot-pulse{0%{opacity:0}50%{opacity:1}100%{opacity:0}}
+
+    body.range-mode .letter-paragraph{cursor:pointer}
+    .range-banner{display:none;position:fixed;bottom:52px;left:50%;transform:translateX(-50%);background:var(--surf);border:1px solid var(--accent);color:var(--text-m);font-family:var(--ui-font);font-size:.62rem;padding:8px 16px;z-index:50;white-space:nowrap}
+    body.range-mode .range-banner{display:block}
+
+    #editor-indicator{display:none;font-size:.56rem;letter-spacing:.1em;color:var(--accent);font-family:var(--ui-font)}
+    body.editor-mode #editor-indicator{display:inline}
+
+    @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+    @media(prefers-contrast:more){:root{--border:rgba(198,123,165,0.5)}}
+
+    @media(max-width:767px){
+      .resize-gutter{display:none!important}
+      #sidebar{position:fixed;left:-260px;top:0;bottom:0;z-index:40;transition:left var(--t);width:260px;min-width:260px;max-width:85vw}
+      #sidebar.open{left:0}
+      #context-pane{position:fixed;right:-320px;top:0;bottom:0;z-index:40;transition:right var(--t);width:min(320px,85vw);min-width:min(320px,85vw);max-width:85vw}
+      #context-pane.open{right:0}
+      #letter-content{padding:24px 20px 20px}
+      .letter-paragraph{max-width:100%}
+      .letter-closing{max-width:100%}
     }
 
-    /* ── Reset ── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
-
-    /* ── Layout ── */
-    body {
-      font-family: var(--ui-font);
-      font-size: 12px;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* ── Top toolbar ── */
-    #toolbar {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: var(--surf);
-      border-bottom: 1px solid var(--border);
-      padding: 8px 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    #toolbar button, #toolbar select, #toolbar input[type="range"] {
-      font-family: var(--ui-font);
-      font-size: 11px;
-      background: var(--surf2);
-      color: var(--text);
-      border: 1px solid var(--border-hi);
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    #toolbar button { padding: 4px 10px; min-height: 28px; }
-    #toolbar button:hover { background: var(--accent-bg); border-color: var(--accent-dim); }
-    #toolbar button.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
-    #toolbar select { padding: 4px 6px; height: 28px; }
-    #toolbar input[type="range"] { width: 80px; }
-    .toolbar-sep { width: 1px; height: 20px; background: var(--border-hi); flex-shrink: 0; }
-    #toolbar label { font-size: 10px; color: var(--text-d); }
-
-    /* ── Progress bar ── */
-    #progress-wrap {
-      height: 3px;
-      background: var(--surf2);
-      position: sticky;
-      top: 49px;
-      z-index: 99;
-    }
-    #progress-fill {
-      height: 100%;
-      background: var(--accent);
-      width: 0%;
-      transition: width 0.3s ease;
-    }
-
-    /* ── Book content area ── */
-    #book {
-      max-width: 680px;
-      margin: 0 auto;
-      padding: 32px 24px 80px;
-      width: 100%;
-    }
-    #book-title {
-      font-family: var(--ui-font);
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-d);
-      margin-bottom: 32px;
-    }
-
-    /* ── Paragraph styles ── */
-    .para {
-      font-family: var(--book-font);
-      font-size: var(--font-size);
-      line-height: 1.8;
-      color: var(--text);
-      margin-bottom: 16px;
-      cursor: pointer;
-      border-radius: 3px;
-      padding: 2px 4px;
-      transition: background 0.15s, opacity 0.3s;
-    }
-    .para:hover { background: var(--accent-bg); }
-    .para.current { background: var(--accent-bg); border-left: 3px solid var(--accent); padding-left: 8px; }
-    .para.word-highlight mark { background: var(--accent-dim); color: var(--text); border-radius: 2px; }
-    .para[data-type="heading"] { font-size: calc(var(--font-size) * 1.25); font-weight: bold; margin-top: 24px; }
-    .para[data-type="chapter-title"] { font-size: calc(var(--font-size) * 1.5); font-weight: bold; margin-top: 40px; }
-    .para[data-type="quote"] { padding-left: 20px; border-left: 3px solid var(--border-hi); color: var(--text-m); font-style: italic; }
-
-    /* ── Focus modes ── */
-    [data-focus="reveal"] .para.hidden { opacity: 0; pointer-events: none; height: 0; overflow: hidden; margin: 0; }
-    [data-focus="spotlight"] .para:not(.current) { opacity: 0; pointer-events: none; }
-    [data-focus="spotlight"] .para.current { opacity: 1; }
-    [data-focus="fade-ahead"] .para { opacity: 0; pointer-events: none; }
-    [data-focus="fade-ahead"] .para.current { opacity: 1; pointer-events: auto; }
-    [data-focus="fade-ahead"] .para.fade-near { opacity: 0.15; pointer-events: none; }
-
-    /* ── Formatting toolbar (floating) ── */
-    #fmt-toolbar {
-      display: none;
-      position: fixed;
-      z-index: 200;
-      background: var(--surf);
-      border: 1px solid var(--border-hi);
-      border-radius: 6px;
-      padding: 6px 8px;
-      gap: 4px;
-      align-items: center;
-      flex-wrap: wrap;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-      max-width: 360px;
-    }
-    #fmt-toolbar.visible { display: flex; }
-    #fmt-toolbar button { padding: 3px 8px; min-height: 24px; font-size: 11px; }
-    #fmt-toolbar select { padding: 2px 4px; height: 24px; font-size: 11px; }
-    #fmt-toolbar input[type="color"] { width: 28px; height: 24px; padding: 2px; border-radius: 3px; cursor: pointer; border: 1px solid var(--border-hi); background: var(--surf2); }
-
-    /* ── Settings panel ── */
-    #settings-panel {
-      display: none;
-      position: fixed;
-      top: 0; right: 0;
-      width: min(360px, 100vw);
-      height: 100vh;
-      background: var(--surf);
-      border-left: 1px solid var(--border-hi);
-      z-index: 300;
-      padding: 20px;
-      overflow-y: auto;
-      flex-direction: column;
-      gap: 16px;
-    }
-    #settings-panel.visible { display: flex; }
-    #settings-panel label { font-size: 11px; color: var(--text-d); display: block; margin-bottom: 4px; }
-    #settings-panel input[type="text"],
-    #settings-panel input[type="password"] {
-      width: 100%;
-      background: var(--surf2);
-      border: 1px solid var(--border-hi);
-      border-radius: 4px;
-      color: var(--text);
-      font-family: var(--ui-font);
-      font-size: 11px;
-      padding: 6px 8px;
-    }
-    .settings-group { display: flex; flex-direction: column; gap: 4px; }
-    .settings-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
-
-    /* ── Error / status banner ── */
-    #status {
-      display: none;
-      position: fixed;
-      bottom: 16px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--surf);
-      border: 1px solid var(--border-hi);
-      border-radius: 6px;
-      padding: 10px 16px;
-      font-size: 12px;
-      z-index: 400;
-      max-width: 400px;
-      text-align: center;
-    }
-    #status.visible { display: block; }
-    #status.error { border-color: var(--red); color: var(--red); }
-    #status.success { border-color: var(--green); color: var(--green); }
-
-    /* ── Loading state ── */
-    #loading { text-align: center; padding: 60px 24px; color: var(--text-d); font-size: 12px; }
-
-    @media (max-width: 480px) {
-      #book { padding: 20px 16px 80px; }
-      #toolbar { padding: 6px 10px; gap: 6px; }
+    @media print{
+      #sidebar,#sidebar-reveal,#context-pane,#bottom-bar,#op-feedback,#undo-nav,.pull-strip,#smart-features-panel,#export-panel,#inline-toolbar{display:none!important}
+      body{height:auto;overflow:visible}
+      #letter-content{overflow:visible;height:auto;padding:0}
     }
   </style>
 </head>
 <body>
-
-  <!-- Top toolbar -->
-  <div id="toolbar">
-    <!-- Playback -->
-    <button id="btn-play" title="Play">▶ Play</button>
-    <button id="btn-pause" title="Pause">⏸ Pause</button>
-    <button id="btn-stop" title="Stop">⏹ Stop</button>
-    <button id="btn-prev" title="Previous paragraph">← Para</button>
-    <button id="btn-next" title="Next paragraph">Para →</button>
-    <div class="toolbar-sep"></div>
-
-    <!-- Voice & speed -->
-    <select id="voice-select" title="Voice"></select>
-    <label>Speed</label>
-    <input type="range" id="speed-range" min="0.5" max="2" step="0.1" value="1" title="Speed">
-    <span id="speed-label" style="font-size:11px;color:var(--text-m);min-width:28px">1.0×</span>
-    <div class="toolbar-sep"></div>
-
-    <!-- Font size -->
-    <button id="btn-font-dec" title="Decrease font size">A−</button>
-    <button id="btn-font-inc" title="Increase font size">A+</button>
-    <div class="toolbar-sep"></div>
-
-    <!-- Focus mode -->
-    <select id="focus-select" title="Focus mode">
-      <option value="off">Focus: Off</option>
-      <option value="reveal">Focus: Reveal</option>
-      <option value="spotlight">Focus: Spotlight</option>
-      <option value="fade-ahead">Focus: Fade-ahead</option>
-    </select>
-    <div class="toolbar-sep"></div>
-
-    <!-- Theme -->
-    <button id="btn-theme" title="Toggle theme">◐ Theme</button>
-    <div class="toolbar-sep"></div>
-
-    <!-- Save & Settings -->
-    <button id="btn-save" title="Save to GitHub">💾 Save</button>
-    <button id="btn-settings" title="Settings">⚙ Settings</button>
-  </div>
-
-  <!-- Progress bar -->
-  <div id="progress-wrap"><div id="progress-fill"></div></div>
-
-  <!-- Floating formatting toolbar (shown on double-click) -->
-  <div id="fmt-toolbar">
-    <button id="fmt-bold" title="Bold"><b>B</b></button>
-    <button id="fmt-italic" title="Italic"><i>I</i></button>
-    <button id="fmt-underline" title="Underline"><u>U</u></button>
-    <input type="color" id="fmt-color" title="Text color" value="#ffffff">
-    <select id="fmt-font" title="Font family">
-      <option value="">— Font —</option>
-      <option value="Georgia,'Times New Roman',serif">Serif</option>
-      <option value="system-ui,sans-serif">Sans-serif</option>
-      <option value="'JetBrains Mono',monospace">Monospace</option>
-    </select>
-    <select id="fmt-indent" title="Indent">
-      <option value="">— Indent —</option>
-      <option value="0px">None</option>
-      <option value="24px">Medium</option>
-      <option value="48px">Large</option>
-    </select>
-    <select id="fmt-type" title="Paragraph type">
-      <option value="normal">Normal</option>
-      <option value="heading">Heading</option>
-      <option value="chapter-title">Chapter Title</option>
-      <option value="quote">Quote</option>
-    </select>
-    <button id="fmt-close" title="Close">✕</button>
-  </div>
-
-  <!-- Settings panel -->
-  <div id="settings-panel">
-    <div class="settings-title">⚙ Settings</div>
-    <button id="btn-settings-close" style="align-self:flex-end;margin-top:-32px">✕ Close</button>
-
-    <div class="settings-group">
-      <label>GitHub Username</label>
-      <input type="text" id="gh-owner" placeholder="your-github-username">
+<div id="app">
+  <div id="sidebar-reveal" class="bar-tip" role="button" tabindex="0" aria-label="Show letter list" data-tip="Show letter list"></div>
+  <nav id="sidebar" aria-label="Navigation">
+    <div class="sidebar-head">
+      <span class="sidebar-head-title" id="sidebar-head-label">Letters</span>
+      <button type="button" class="sidebar-collapse-btn bar-tip" id="btn-sidebar-collapse" aria-label="Hide letter list" data-tip="Hide letter list (same as ≡ when open)">⟨</button>
     </div>
-    <div class="settings-group">
-      <label>GitHub Repo Name</label>
-      <input type="text" id="gh-repo" placeholder="isabelle-audiobook">
-    </div>
-    <div class="settings-group">
-      <label>GitHub Personal Access Token (public_repo scope)</label>
-      <input type="password" id="gh-token" placeholder="ghp_...">
-    </div>
-    <button id="btn-save-settings">Save Settings</button>
+    <div id="sidebar-nav" role="list"></div>
+  </nav>
+  <div class="resize-gutter" id="gutter-sidebar" role="separator" aria-orientation="vertical" aria-label="Resize navigation" tabindex="0"></div>
 
-    <hr style="border-color:var(--border);margin:8px 0">
-    <div style="font-size:11px;color:var(--text-d);line-height:1.6">
-      Token is stored only in this browser's localStorage.<br>
-      It is only sent to api.github.com.
+  <div id="main">
+    <div id="letter-pane">
+      <div id="narrator-line" aria-hidden="true"></div>
+      <div id="letter-content" role="main">
+        <p id="loading" style="padding:48px 60px;color:var(--text-d);font-size:.9rem">Loading…</p>
+      </div>
     </div>
+    <div class="resize-gutter" id="gutter-context" role="separator" aria-orientation="vertical" aria-label="Resize context panel" tabindex="0"></div>
+
+    <aside id="context-pane" class="collapsed" aria-label="Context panel">
+      <div id="context-content"></div>
+    </aside>
   </div>
+</div>
 
-  <!-- Status banner -->
-  <div id="status"></div>
-
-  <!-- Book content -->
-  <div id="book">
-    <div id="loading">Loading book…</div>
-    <div id="book-title"></div>
-    <div id="paragraphs"></div>
+<div id="bottom-bar">
+  <div class="bottom-bar-resize-gutter bar-tip" id="bottom-bar-resize" role="separator" aria-orientation="horizontal" aria-label="Resize controls height. Arrow keys adjust; Enter resets." tabindex="0" data-tip="Drag to resize bar height · ↑↓ keys · Enter resets"></div>
+  <div class="bar-row" id="bar-row-1">
+    <button type="button" class="bar-icon bar-tip" id="btn-play" aria-label="Play" data-tip="Play or pause reading aloud (letter text)">▶</button>
+    <button type="button" class="bar-icon bar-tip" id="btn-stop" aria-label="Stop" data-tip="Stop playback and reset to the start of the letter">◼</button>
+    <button type="button" class="bar-icon bar-tip" id="btn-prev" aria-label="Previous" data-tip="Previous paragraph">←</button>
+    <button type="button" class="bar-icon bar-tip" id="btn-next" aria-label="Next" data-tip="Next paragraph">→</button>
+    <span class="bar-tip bar-tip-speed" data-tip="Speech rate for narration (0.5×–2×)">
+      <input type="range" class="speed-slider" id="speed-range" min="0.5" max="2" step="0.1" value="1" aria-label="Playback speed">
+      <span class="speed-label" id="speed-label">1.0×</span>
+    </span>
+    <button type="button" class="bar-icon bar-tip" id="btn-narrator" aria-label="Narrator mode" data-tip="Cycle narrator: letters only → context snippets → both → silent">♪</button>
+    <span class="bar-tip-wrap-select" data-tip="Voice for reading the letter (system TTS)">
+      <select id="letter-voice-select" aria-label="Select letter voice" style="background:var(--surf2);border:none;color:var(--text-m);font-family:var(--ui-font);font-size:.62rem;padding:4px;max-width:120px"></select>
+    </span>
+    <span class="bar-tip-wrap-select" data-tip="Voice for context / footnote snippets when narrator includes them">
+      <select id="context-voice-select" aria-label="Select context voice" style="background:var(--surf2);border:none;color:var(--text-d);font-family:var(--ui-font);font-size:.62rem;padding:4px;max-width:100px"></select>
+    </span>
+    <button type="button" class="bar-icon bar-tip" id="btn-range-copy" aria-label="Range copy mode" data-tip="Select two paragraphs to copy the range (click to start, click to end)">✂</button>
+    <button type="button" class="bar-icon bar-tip" id="btn-font-dec" aria-label="Decrease font size" data-tip="Smaller text">A-</button>
+    <button type="button" class="bar-icon bar-tip" id="btn-font-inc" aria-label="Increase font size" data-tip="Larger text">A+</button>
+    <button type="button" class="bar-icon bar-tip" id="btn-theme" aria-label="Toggle theme" data-tip="Switch light / dark theme">◐</button>
+    <button type="button" class="bar-text-btn bar-tip" id="btn-translate" aria-label="Translate visible letter text" data-tip="Open the current letter’s text in Google Translate">Translate</button>
+    <button type="button" class="bar-icon bar-tip" id="btn-focus" aria-label="Reading mode" data-tip="Cycle reading focus: off → reveal → spotlight → fade ahead → page view">⊞</button>
+    <button type="button" class="bar-icon bar-tip" id="btn-context" aria-label="Context panel" data-tip="Show or hide the context / references panel">📖</button>
+    <button type="button" class="bar-icon bar-tip" id="btn-sidebar" aria-label="Navigation" data-tip="Show or hide the letter list">≡</button>
+    <button type="button" class="bar-icon bar-tip" id="btn-export" aria-label="Export" data-tip="Export letter or book (HTML, print, plain text)">↓</button>
+    <button type="button" class="bar-icon bar-tip" id="btn-smart" aria-label="Smart features" data-tip="Smart scroll and navigation options">✦</button>
+    <button type="button" class="bar-icon bar-tip" id="btn-save" aria-label="Save" data-tip="Save book and context to GitHub (needs token)">💾</button>
+    <button type="button" class="bar-icon bar-collapse bar-tip" id="btn-bottom-collapse" aria-label="Hide controls" data-tip="Hide this bar (shortcut: Shift+H)">▽</button>
+    <span id="editor-indicator" class="bar-tip" aria-label="Editor mode active" data-tip="Inline editor is unlocked — tap text to edit">🖉</span>
   </div>
+</div>
+<div id="op-feedback" role="status" aria-live="polite"></div>
+<div id="undo-nav" role="status" aria-live="polite"></div>
+<div class="pull-strip bar-tip" id="pull-strip" aria-label="Show controls" role="button" tabindex="0" data-tip="Show bottom controls again"></div>
 
-  <script type="module" src="js/app.js"></script>
+<div class="range-banner" id="range-banner" aria-live="polite">Click a sentence to set start → click another to set end → copy</div>
+<div id="ctx-sync-dot" aria-hidden="true"></div>
+<div id="smart-features-panel" role="dialog" aria-label="Smart Features" aria-modal="true" tabindex="-1"></div>
+<div id="export-panel" role="dialog" aria-label="Export"></div>
+<div id="inline-toolbar" role="toolbar" aria-label="Format">
+  <button type="button" onclick="window._editor?.applyInlineFormat('bold')" aria-label="Bold">B</button>
+  <button type="button" onclick="window._editor?.applyInlineFormat('italic')" aria-label="Italic"><em>I</em></button>
+  <button type="button" onclick="window._editor?.applyInlineFormat('underline')" aria-label="Underline"><u>U</u></button>
+  <button type="button" onclick="window._editor?.closeInlineEdit()" aria-label="Close editor">✕</button>
+</div>
+
+<script type="module" src="js/app.js"></script>
 </body>
 </html>

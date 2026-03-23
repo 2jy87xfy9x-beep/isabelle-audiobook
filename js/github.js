@@ -1,83 +1,98 @@
-// js/github.js
-// GitHub Contents API GET/PUT for book.json.
+const LS_TOKEN = 'isabelle-v2-github-token';
 
-function getSettings() {
-  return {
-    owner: localStorage.getItem('gh_owner') || '',
-    repo: localStorage.getItem('gh_repo') || 'isabelle-audiobook',
-    token: localStorage.getItem('gh_token') || ''
-  };
+function getConfig() {
+  if (typeof window === 'undefined') return null;
+  const token = localStorage.getItem(LS_TOKEN);
+  const match = window.location.hostname.match(/^([^.]+)\.github\.io$/);
+  if (!match) return null;
+  const owner = match[1];
+  const repo = document.documentElement.dataset.repo || 'isabelle';
+  if (!token) return null;
+  return { owner, repo, token };
 }
 
-function apiUrl(owner, repo) {
-  return `https://api.github.com/repos/${owner}/${repo}/contents/book.json`;
+function utf8ToBase64(str) {
+  if (typeof btoa !== 'undefined') {
+    return btoa(unescape(encodeURIComponent(str)));
+  }
+  return Buffer.from(str, 'utf8').toString('base64');
 }
 
-/**
- * Fetches the current book.json from GitHub API.
- * Returns { sha, book } where book is the parsed JSON.
- */
-export async function fetchFromGitHub() {
-  const { owner, repo, token } = getSettings();
-  if (!owner || !token) throw new Error('missing_config');
-
-  const res = await fetch(apiUrl(owner, repo), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github.v3+json'
+export async function fetchFromGitHub(filename) {
+  const cfg = getConfig();
+  if (!cfg) throw Object.assign(new Error('missing_config'), { code: 'missing_config' });
+  const res = await fetch(
+    `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${filename}`,
+    {
+      headers: {
+        Authorization: `Bearer ${cfg.token}`,
+        Accept: 'application/vnd.github+json',
+      },
     }
-  });
-
-  if (res.status === 401 || res.status === 403) throw new Error('bad_token');
-  if (res.status === 404) throw new Error('repo_not_found');
-  if (res.status === 429) throw new Error('rate_limited');
+  );
+  if (res.status === 401 || res.status === 403 || res.status === 404) {
+    throw Object.assign(new Error('bad_token'), { code: 'bad_token' });
+  }
+  if (res.status === 429) {
+    throw Object.assign(new Error('rate_limited'), { code: 'rate_limited' });
+  }
   if (!res.ok) throw new Error(`github_error_${res.status}`);
-
   const data = await res.json();
-  const book = JSON.parse(atob(data.content.replace(/\n/g, '')));
-  return { sha: data.sha, book };
+  const jsonStr =
+    typeof atob !== 'undefined'
+      ? decodeURIComponent(escape(atob(data.content.replace(/\s/g, ''))))
+      : Buffer.from(data.content, 'base64').toString('utf8');
+  return { content: JSON.parse(jsonStr), sha: data.sha };
 }
 
-/**
- * Saves the full book object to GitHub.
- * Merges lastPosition using timestamp-based conflict resolution.
- */
-export async function saveToGitHub(localBook) {
-  const { owner, repo, token } = getSettings();
-  if (!owner || !token) throw new Error('missing_config');
+export async function saveToGitHub(filename, content) {
+  const cfg = getConfig();
+  if (!cfg) throw Object.assign(new Error('missing_config'), { code: 'missing_config' });
 
-  // GET current SHA and remote position
-  const { sha, book: remoteBook } = await fetchFromGitHub();
+  let sha;
+  try {
+    const current = await fetchFromGitHub(filename);
+    sha = current.sha;
+  } catch (e) {
+    if (e.code === 'missing_config' || e.code === 'bad_token') throw e;
+    throw Object.assign(new Error('get_failed'), { code: 'get_failed' });
+  }
 
-  // Merge position: use whichever timestamp is more recent
-  const localTs = localBook.lastPositionTimestamp || 0;
-  const remoteTs = remoteBook.lastPositionTimestamp || 0;
-
-  const merged = {
-    ...localBook,
-    lastPosition: localTs >= remoteTs ? localBook.lastPosition : remoteBook.lastPosition,
-    lastPositionTimestamp: Math.max(localTs, remoteTs)
-  };
-
-  const content = btoa(unescape(encodeURIComponent(JSON.stringify(merged, null, 2))));
-
-  const res = await fetch(apiUrl(owner, repo), {
-    method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github.v3+json',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      message: 'Update book content and position',
-      content,
-      sha
-    })
+  const raw = JSON.stringify(content, null, 2);
+  const body = JSON.stringify({
+    message: `update ${filename}`,
+    content: utf8ToBase64(raw),
+    sha,
   });
 
-  if (res.status === 401 || res.status === 403) throw new Error('bad_token');
-  if (res.status === 429) throw new Error('rate_limited');
-  if (!res.ok) throw new Error(`github_error_${res.status}`);
+  const res = await fetch(
+    `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${filename}`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${cfg.token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/vnd.github+json',
+      },
+      body,
+    }
+  );
 
-  return merged;
+  if (res.status === 409 || res.status === 422) {
+    throw Object.assign(new Error('sha_conflict'), { code: 'sha_conflict' });
+  }
+  if (res.status === 401 || res.status === 403 || res.status === 404) {
+    throw Object.assign(new Error('bad_token'), { code: 'bad_token' });
+  }
+  if (res.status === 429) {
+    throw Object.assign(new Error('rate_limited'), { code: 'rate_limited' });
+  }
+  if (!res.ok) throw new Error(`github_error_${res.status}`);
+}
+
+export function getToken() {
+  return typeof localStorage !== 'undefined' ? localStorage.getItem(LS_TOKEN) || '' : '';
+}
+export function setToken(t) {
+  if (typeof localStorage !== 'undefined') localStorage.setItem(LS_TOKEN, t);
 }

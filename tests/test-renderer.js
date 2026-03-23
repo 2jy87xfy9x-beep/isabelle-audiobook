@@ -1,35 +1,54 @@
-// tests/test-renderer.js — run with: node tests/test-renderer.js
-import { createParaElement, applyStyle } from '../js/renderer.js';
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
+import {
+  buildAliasMap,
+  injectContextSpans,
+  renderLetterMeta,
+} from '../js/renderer.js';
 
-const dom = new JSDOM('<!DOCTYPE html><body></body>');
-global.document = dom.window.document;
+test('buildAliasMap returns map from alias to entry id', () => {
+  const entries = [
+    {
+      id: 'marie-christine',
+      name: 'Marie-Christine of Austria',
+      aliases: ['Christine', 'MC'],
+    },
+  ];
+  const map = buildAliasMap(entries);
+  assert.equal(map.get('marie-christine of austria'), 'marie-christine');
+  assert.equal(map.get('christine'), 'marie-christine');
+});
 
-// Test 1: normal paragraph renders as <p>
-const para = { id: 1, text: 'Hello world', type: 'normal', style: {} };
-const el = createParaElement(para, 0);
-console.assert(el.tagName === 'P', 'Test 1: should be P tag');
-console.assert(el.textContent === 'Hello world', 'Test 1: text content');
-console.assert(el.dataset.index === '0', 'Test 1: data-index');
+test('injectContextSpans wraps matched text in span', () => {
+  const map = new Map([['christine', 'marie-christine']]);
+  const sorted = [['christine', 'marie-christine']];
+  const dom = new JSDOM('<!DOCTYPE html><body></body>');
+  const p = dom.window.document.createElement('p');
+  p.textContent = 'I write to Christine today.';
+  injectContextSpans(p, sorted, dom.window.document);
+  assert.ok(p.innerHTML.includes('data-ref-id="marie-christine"'));
+  assert.ok(p.innerHTML.includes('Christine'));
+});
 
-// Test 2: heading renders as <h2>
-const heading = { id: 2, text: 'A Heading', type: 'heading', style: {} };
-const h = createParaElement(heading, 1);
-console.assert(h.tagName === 'H2', 'Test 2: should be H2');
+test('injectContextSpans does not modify text without matches', () => {
+  const sorted = [['napoleon', 'napoleon-i']];
+  const dom = new JSDOM('<!DOCTYPE html><body></body>');
+  const p = dom.window.document.createElement('p');
+  p.textContent = 'No named entities here.';
+  const before = p.textContent;
+  injectContextSpans(p, sorted, dom.window.document);
+  assert.equal(p.textContent, before);
+});
 
-// Test 3: bold style applied
-const bold = { id: 3, text: 'Bold', type: 'normal', style: { bold: true } };
-const b = createParaElement(bold, 2);
-console.assert(b.style.fontWeight === 'bold', 'Test 3: bold');
-
-// Test 4: chapter-title renders as <h1>
-const chap = { id: 4, text: 'Chapter One', type: 'chapter-title', style: {} };
-const c = createParaElement(chap, 3);
-console.assert(c.tagName === 'H1', 'Test 4: should be H1');
-
-// Test 5: quote renders as <blockquote>
-const quote = { id: 5, text: 'A quote', type: 'quote', style: {} };
-const q = createParaElement(quote, 4);
-console.assert(q.tagName === 'BLOCKQUOTE', 'Test 5: should be BLOCKQUOTE');
-
-console.log('✓ renderer tests passed');
+test('renderLetterMeta returns date and letter number elements', () => {
+  const dom = new JSDOM('<!DOCTYPE html><body></body>');
+  const letter = {
+    letter_number: 12,
+    date_display: '14 November 1760',
+    id: 'letter-012',
+  };
+  const meta = renderLetterMeta(letter, dom.window.document);
+  assert.ok(meta.querySelector('[data-letter-number]'));
+  assert.ok(meta.querySelector('[data-letter-date]'));
+});
