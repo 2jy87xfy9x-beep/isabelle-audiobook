@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Isabelle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ── Design tokens ── */
+    :root {
+      --bg: #09060c;
+      --surf: #0f0a13;
+      --surf2: #140e18;
+      --border: rgba(198,123,165,0.14);
+      --border-hi: rgba(198,123,165,0.38);
+      --accent: #c67ba5;
+      --accent-bg: rgba(198,123,165,0.10);
+      --accent-dim: rgba(198,123,165,0.28);
+      --text: rgba(255,255,255,0.80);
+      --text-m: rgba(255,255,255,0.50);
+      --text-d: rgba(255,255,255,0.28);
+      --green: #4ade80;
+      --red: #f87171;
+      --amber: #d07846;
+      --book-font: Georgia, 'Times New Roman', serif;
+      --ui-font: 'JetBrains Mono', monospace;
+      --font-size: 16px;
+    }
+    [data-theme="light"] {
+      --bg: #faf8f5;
+      --surf: #f0ede8;
+      --surf2: #e8e4de;
+      --border: rgba(120,60,90,0.14);
+      --border-hi: rgba(120,60,90,0.30);
+      --accent: #9b4f7a;
+      --accent-bg: rgba(120,60,90,0.08);
+      --accent-dim: rgba(120,60,90,0.22);
+      --text: rgba(30,20,25,0.85);
+      --text-m: rgba(30,20,25,0.55);
+      --text-d: rgba(30,20,25,0.35);
+    }
+
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+    /* ── Layout ── */
+    body {
+      font-family: var(--ui-font);
+      font-size: 12px;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Top toolbar ── */
+    #toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--surf);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    #toolbar button, #toolbar select, #toolbar input[type="range"] {
+      font-family: var(--ui-font);
+      font-size: 11px;
+      background: var(--surf2);
+      color: var(--text);
+      border: 1px solid var(--border-hi);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #toolbar button { padding: 4px 10px; min-height: 28px; }
+    #toolbar button:hover { background: var(--accent-bg); border-color: var(--accent-dim); }
+    #toolbar button.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+    #toolbar select { padding: 4px 6px; height: 28px; }
+    #toolbar input[type="range"] { width: 80px; }
+    .toolbar-sep { width: 1px; height: 20px; background: var(--border-hi); flex-shrink: 0; }
+    #toolbar label { font-size: 10px; color: var(--text-d); }
+
+    /* ── Progress bar ── */
+    #progress-wrap {
+      height: 3px;
+      background: var(--surf2);
+      position: sticky;
+      top: 49px;
+      z-index: 99;
+    }
+    #progress-fill {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    /* ── Book content area ── */
+    #book {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 32px 24px 80px;
+      width: 100%;
+    }
+    #book-title {
+      font-family: var(--ui-font);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-d);
+      margin-bottom: 32px;
+    }
+
+    /* ── Paragraph styles ── */
+    .para {
+      font-family: var(--book-font);
+      font-size: var(--font-size);
+      line-height: 1.8;
+      color: var(--text);
+      margin-bottom: 16px;
+      cursor: pointer;
+      border-radius: 3px;
+      padding: 2px 4px;
+      transition: background 0.15s, opacity 0.3s;
+    }
+    .para:hover { background: var(--accent-bg); }
+    .para.current { background: var(--accent-bg); border-left: 3px solid var(--accent); padding-left: 8px; }
+    .para.word-highlight mark { background: var(--accent-dim); color: var(--text); border-radius: 2px; }
+    .para[data-type="heading"] { font-size: calc(var(--font-size) * 1.25); font-weight: bold; margin-top: 24px; }
+    .para[data-type="chapter-title"] { font-size: calc(var(--font-size) * 1.5); font-weight: bold; margin-top: 40px; }
+    .para[data-type="quote"] { padding-left: 20px; border-left: 3px solid var(--border-hi); color: var(--text-m); font-style: italic; }
+
+    /* ── Focus modes ── */
+    [data-focus="reveal"] .para.hidden { opacity: 0; pointer-events: none; height: 0; overflow: hidden; margin: 0; }
+    [data-focus="spotlight"] .para:not(.current) { opacity: 0; pointer-events: none; }
+    [data-focus="spotlight"] .para.current { opacity: 1; }
+    [data-focus="fade-ahead"] .para { opacity: 0; pointer-events: none; }
+    [data-focus="fade-ahead"] .para.current { opacity: 1; pointer-events: auto; }
+    [data-focus="fade-ahead"] .para.fade-near { opacity: 0.15; pointer-events: none; }
+
+    /* ── Formatting toolbar (floating) ── */
+    #fmt-toolbar {
+      display: none;
+      position: fixed;
+      z-index: 200;
+      background: var(--surf);
+      border: 1px solid var(--border-hi);
+      border-radius: 6px;
+      padding: 6px 8px;
+      gap: 4px;
+      align-items: center;
+      flex-wrap: wrap;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      max-width: 360px;
+    }
+    #fmt-toolbar.visible { display: flex; }
+    #fmt-toolbar button { padding: 3px 8px; min-height: 24px; font-size: 11px; }
+    #fmt-toolbar select { padding: 2px 4px; height: 24px; font-size: 11px; }
+    #fmt-toolbar input[type="color"] { width: 28px; height: 24px; padding: 2px; border-radius: 3px; cursor: pointer; border: 1px solid var(--border-hi); background: var(--surf2); }
+
+    /* ── Settings panel ── */
+    #settings-panel {
+      display: none;
+      position: fixed;
+      top: 0; right: 0;
+      width: min(360px, 100vw);
+      height: 100vh;
+      background: var(--surf);
+      border-left: 1px solid var(--border-hi);
+      z-index: 300;
+      padding: 20px;
+      overflow-y: auto;
+      flex-direction: column;
+      gap: 16px;
+    }
+    #settings-panel.visible { display: flex; }
+    #settings-panel label { font-size: 11px; color: var(--text-d); display: block; margin-bottom: 4px; }
+    #settings-panel input[type="text"],
+    #settings-panel input[type="password"] {
+      width: 100%;
+      background: var(--surf2);
+      border: 1px solid var(--border-hi);
+      border-radius: 4px;
+      color: var(--text);
+      font-family: var(--ui-font);
+      font-size: 11px;
+      padding: 6px 8px;
+    }
+    .settings-group { display: flex; flex-direction: column; gap: 4px; }
+    .settings-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+
+    /* ── Error / status banner ── */
+    #status {
+      display: none;
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surf);
+      border: 1px solid var(--border-hi);
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-size: 12px;
+      z-index: 400;
+      max-width: 400px;
+      text-align: center;
+    }
+    #status.visible { display: block; }
+    #status.error { border-color: var(--red); color: var(--red); }
+    #status.success { border-color: var(--green); color: var(--green); }
+
+    /* ── Loading state ── */
+    #loading { text-align: center; padding: 60px 24px; color: var(--text-d); font-size: 12px; }
+
+    @media (max-width: 480px) {
+      #book { padding: 20px 16px 80px; }
+      #toolbar { padding: 6px 10px; gap: 6px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top toolbar -->
+  <div id="toolbar">
+    <!-- Playback -->
+    <button id="btn-play" title="Play">▶ Play</button>
+    <button id="btn-pause" title="Pause">⏸ Pause</button>
+    <button id="btn-stop" title="Stop">⏹ Stop</button>
+    <button id="btn-prev" title="Previous paragraph">← Para</button>
+    <button id="btn-next" title="Next paragraph">Para →</button>
+    <div class="toolbar-sep"></div>
+
+    <!-- Voice & speed -->
+    <select id="voice-select" title="Voice"></select>
+    <label>Speed</label>
+    <input type="range" id="speed-range" min="0.5" max="2" step="0.1" value="1" title="Speed">
+    <span id="speed-label" style="font-size:11px;color:var(--text-m);min-width:28px">1.0×</span>
+    <div class="toolbar-sep"></div>
+
+    <!-- Font size -->
+    <button id="btn-font-dec" title="Decrease font size">A−</button>
+    <button id="btn-font-inc" title="Increase font size">A+</button>
+    <div class="toolbar-sep"></div>
+
+    <!-- Focus mode -->
+    <select id="focus-select" title="Focus mode">
+      <option value="off">Focus: Off</option>
+      <option value="reveal">Focus: Reveal</option>
+      <option value="spotlight">Focus: Spotlight</option>
+      <option value="fade-ahead">Focus: Fade-ahead</option>
+    </select>
+    <div class="toolbar-sep"></div>
+
+    <!-- Theme -->
+    <button id="btn-theme" title="Toggle theme">◐ Theme</button>
+    <div class="toolbar-sep"></div>
+
+    <!-- Save & Settings -->
+    <button id="btn-save" title="Save to GitHub">💾 Save</button>
+    <button id="btn-settings" title="Settings">⚙ Settings</button>
+  </div>
+
+  <!-- Progress bar -->
+  <div id="progress-wrap"><div id="progress-fill"></div></div>
+
+  <!-- Floating formatting toolbar (shown on double-click) -->
+  <div id="fmt-toolbar">
+    <button id="fmt-bold" title="Bold"><b>B</b></button>
+    <button id="fmt-italic" title="Italic"><i>I</i></button>
+    <button id="fmt-underline" title="Underline"><u>U</u></button>
+    <input type="color" id="fmt-color" title="Text color" value="#ffffff">
+    <select id="fmt-font" title="Font family">
+      <option value="">— Font —</option>
+      <option value="Georgia,'Times New Roman',serif">Serif</option>
+      <option value="system-ui,sans-serif">Sans-serif</option>
+      <option value="'JetBrains Mono',monospace">Monospace</option>
+    </select>
+    <select id="fmt-indent" title="Indent">
+      <option value="">— Indent —</option>
+      <option value="0px">None</option>
+      <option value="24px">Medium</option>
+      <option value="48px">Large</option>
+    </select>
+    <select id="fmt-type" title="Paragraph type">
+      <option value="normal">Normal</option>
+      <option value="heading">Heading</option>
+      <option value="chapter-title">Chapter Title</option>
+      <option value="quote">Quote</option>
+    </select>
+    <button id="fmt-close" title="Close">✕</button>
+  </div>
+
+  <!-- Settings panel -->
+  <div id="settings-panel">
+    <div class="settings-title">⚙ Settings</div>
+    <button id="btn-settings-close" style="align-self:flex-end;margin-top:-32px">✕ Close</button>
+
+    <div class="settings-group">
+      <label>GitHub Username</label>
+      <input type="text" id="gh-owner" placeholder="your-github-username">
+    </div>
+    <div class="settings-group">
+      <label>GitHub Repo Name</label>
+      <input type="text" id="gh-repo" placeholder="isabelle-audiobook">
+    </div>
+    <div class="settings-group">
+      <label>GitHub Personal Access Token (public_repo scope)</label>
+      <input type="password" id="gh-token" placeholder="ghp_...">
+    </div>
+    <button id="btn-save-settings">Save Settings</button>
+
+    <hr style="border-color:var(--border);margin:8px 0">
+    <div style="font-size:11px;color:var(--text-d);line-height:1.6">
+      Token is stored only in this browser's localStorage.<br>
+      It is only sent to api.github.com.
+    </div>
+  </div>
+
+  <!-- Status banner -->
+  <div id="status"></div>
+
+  <!-- Book content -->
+  <div id="book">
+    <div id="loading">Loading book…</div>
+    <div id="book-title"></div>
+    <div id="paragraphs"></div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
