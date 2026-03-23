@@ -2,7 +2,9 @@
 
 **Purpose:** Actionable follow-ups after the v2 content + app implementation. Use the [table of contents](#table-of-contents) to jump to a section. Collapsible blocks use `<details>` / `<summary>` (supported in GitHub, VS Code Markdown preview, and many viewers).
 
-**Related:** [Implementation report (2026-03-23)](reports/2026-03-23-isabelle-v2-implementation-report.md) · [Design spec](superpowers/specs/2026-03-23-isabelle-v2-design.md) · Branch `feature/isabelle-v2-content-and-app`
+**Related:** [Implementation report (2026-03-23)](2026-03-23-isabelle-v2-implementation-report.md) · [Design spec](../superpowers/specs/2026-03-23-isabelle-v2-design.md) · Branch `feature/isabelle-v2-content-and-app`
+
+**Path:** `C:\audio_book\docs\reports\next-steps-isabelle-v2.md`
 
 ---
 
@@ -155,7 +157,7 @@ After any `extract.js` change: `node extract.js` → regenerate views → `map-r
 Offline mode produced **stub** entries (places, concepts, chapter titles). With the API:
 
 - Review **`context.json`** for duplicate `id` values after slugify (`build-context.js` dedupes).
-- Fill **`content`** paragraphs for key people (Marie-Christine, Joseph II, etc.) per [design spec](superpowers/specs/2026-03-23-isabelle-v2-design.md).
+- Fill **`content`** paragraphs for key people (Marie-Christine, Joseph II, etc.) per [design spec](../superpowers/specs/2026-03-23-isabelle-v2-design.md).
 - Add **`aliases`** that actually appear in letter text so `map-refs.js` and the in-app renderer agree.
 - Add **`relatedRefs`** for cross-links in the context panel.
 
@@ -300,7 +302,7 @@ Add to **CI** (GitHub Actions, etc.): checkout → `npm ci` → command above (N
 
 ## 7. Spec gaps and polish
 
-Cross-check with [2026-03-23-isabelle-v2-design.md](superpowers/specs/2026-03-23-isabelle-v2-design.md).
+Cross-check with [2026-03-23-isabelle-v2-design.md](../superpowers/specs/2026-03-23-isabelle-v2-design.md).
 
 <details>
 <summary><strong>7.1 Narrator “both” mode</strong></summary>
@@ -377,10 +379,10 @@ Run **axe** or Lighthouse on `index.html`; verify **tab order** (sidebar → let
 <details>
 <summary><strong>8.3 Documentation links (repo-relative)</strong></summary>
 
-- [Implementation report](reports/2026-03-23-isabelle-v2-implementation-report.md)
-- [Design spec](superpowers/specs/2026-03-23-isabelle-v2-design.md)
-- [Content preparation plan](superpowers/plans/2026-03-23-isabelle-content-preparation.md)
-- [App build plan](superpowers/plans/2026-03-23-isabelle-app-build.md)
+- [Implementation report](2026-03-23-isabelle-v2-implementation-report.md)
+- [Design spec](../superpowers/specs/2026-03-23-isabelle-v2-design.md)
+- [Content preparation plan](../superpowers/plans/2026-03-23-isabelle-content-preparation.md)
+- [App build plan](../superpowers/plans/2026-03-23-isabelle-app-build.md)
 
 </details>
 

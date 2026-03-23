@@ -83,6 +83,8 @@ Multiple commits were made across Tasks 0–10; a few parallel `git commit` race
 
 ## Follow-ups
 
+See **[Next steps (full checklist)](next-steps-isabelle-v2.md)** in this folder for detailed procedures, QA lists, and links.
+
 1. Run **`generate-views.js`** and **`build-context.js`** with a real API key for production-quality translations and entity extraction.
 2. Consider **`git add Isabelle.html`** (and any docs you want tracked) if the book source should live in the repo; it remained untracked here.
 3. GitHub save from **`localhost`** will not resolve `*.github.io` hostname rules for `github.js`—expect save to prompt for missing config unless you adjust `getConfig()` for local dev or use GitHub Pages URL.
