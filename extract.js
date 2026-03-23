@@ -19,6 +19,7 @@ function cleanHtml(raw) {
   t = t.replace(/\d+\s*%?\s*minute[s]?\s+(?:ago\s+)?left\s+in\s+chapter\s+\d*\s*%?/gi, '');
   t = t.replace(/minute[s]?\s+left\s+in\s+chapter\s+\d*\s*%?/gi, '');
   t = t.replace(/\b\d+\s*%\s*(Letter|Tl|At)\s+\d+/gi, '');
+  t = t.replace(/\s+Letter\s+\d+\s+Most\s+Recent\s*$/im, '');
   // Decode HTML entities
   t = t.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&#\d+;/g, ' ');
   // Collapse whitespace
