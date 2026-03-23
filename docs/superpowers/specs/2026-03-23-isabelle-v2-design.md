@@ -345,7 +345,7 @@ Implemented as `role="tablist"` containing `role="tab"` elements. Active tab has
 
 On mobile: a single `<button>` showing the current view label. Tap opens an inline vertical list (`role="listbox"`, `aria-expanded="true"`). Focus moves to the first option on open. Arrow keys move between options. Enter selects. Esc closes and returns focus to the trigger button.
 
-**View memory:** switching view on a specific letter stores the key in `localStorage` under `view-memory-{letter_id}`. Global default stored under `view-default`. Only overrides stored.
+**View memory:** switching view on a specific letter stores the key in `localStorage` under `isabelle-v2-view-memory-{letter_id}`. Global default stored under `isabelle-v2-view-default`. Only overrides stored.
 
 ---
 
