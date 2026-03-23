@@ -17,12 +17,16 @@ export function isEditorUnlocked() {
   return _unlocked;
 }
 
-function toggleEditorMode() {
+export function toggleEditorMode() {
   _unlocked = !_unlocked;
   document.body.classList.toggle('editor-mode', _unlocked);
   const indicator = document.getElementById('editor-indicator');
-  if (indicator) indicator.style.display = _unlocked ? 'inline' : 'none';
-  showFeedback(_unlocked ? 'Editor mode on' : 'Editor mode off');
+  if (indicator) {
+    indicator.setAttribute('aria-pressed', _unlocked ? 'true' : 'false');
+    indicator.classList.toggle('active', _unlocked);
+    indicator.title = _unlocked ? 'Editor on — click to lock' : 'Click to unlock inline editor';
+  }
+  showFeedback(_unlocked ? 'Editor mode on (Shift+E to toggle)' : 'Editor mode off');
 }
 
 export function attachLongPress(el, callback) {

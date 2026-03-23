@@ -19,6 +19,7 @@ import {
   attachLongPress,
   isEditorUnlocked,
   renderMappingEditor,
+  toggleEditorMode,
 } from './editor.js';
 import { exportLetters } from './exporter.js';
 import {
@@ -29,6 +30,8 @@ import {
   updateNarratorLine,
   initSmartScroll,
   isEnabled,
+  guardianHighlight,
+  guardianSummary,
 } from './smartFeatures.js';
 import { saveToGitHub } from './github.js';
 
@@ -36,6 +39,7 @@ const LS = (k) => `isabelle-v2-${k}`;
 
 let book = null;
 let context = null;
+let fiction = null;
 let letters = [];
 let contextIndex = {};
 let currentLetterIdx = 0;
@@ -99,6 +103,7 @@ async function init() {
 
   book = data.book;
   context = data.context;
+  fiction = data.fiction || { gap_scenes: [], letter_reimaginings: [] };
   letters = book.letters;
   contextIndex = Object.fromEntries((context.entries || []).map((e) => [e.id, e]));
 
@@ -215,6 +220,26 @@ function renderCurrentLetter() {
   });
   container.appendChild(body);
 
+  // Letter Integrity Guardian — highlight artefacts when feature is enabled
+  if (isEnabled('letter-guardian')) {
+    const rawText = letter.views?.original_french || '';
+    guardianHighlight(body, rawText, document);
+    const summary = guardianSummary(rawText);
+    let banner = document.getElementById('guardian-banner');
+    if (summary) {
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'guardian-banner';
+        banner.className = 'guardian-banner';
+        container.prepend(banner);
+      }
+      banner.textContent = `⚠ Integrity issues in original_french: ${summary}`;
+      banner.hidden = false;
+    } else if (banner) {
+      banner.hidden = true;
+    }
+  }
+
   const nav = renderLetterNav(
     letter,
     letters.length,
@@ -230,6 +255,7 @@ function renderCurrentLetter() {
 
   syncToLetter(letter);
   refreshPlayerData();
+  renderTrackBar();
 
   savePosition({
     letter_id: letter.id,
@@ -321,9 +347,177 @@ function toggleContextPanel() {
   else closeContextPanel();
 }
 
+// ── Book 2 track management ───────────────────────────────────────────────────
+
+const BOOK2_TRACKS = [
+  { id: 'contextual',        label: 'Contextual' },
+  { id: 'brief',             label: 'Brief' },
+  { id: 'encyclopedic',      label: 'Encyclopedic' },
+  { id: 'fiction-gaps',      label: 'Fiction: Gaps' },
+  { id: 'fiction-letters',   label: 'Fiction: Letters' },
+];
+const BOOK2_TRACK_KEY        = 'isabelle-v2-book2-track';
+const BOOK2_TRACK_LETTER_KEY = (id) => `isabelle-v2-book2-track-${id}`;
+
+function getBook2Track(letterId) {
+  return localStorage.getItem(BOOK2_TRACK_LETTER_KEY(letterId))
+    || localStorage.getItem(BOOK2_TRACK_KEY)
+    || 'contextual';
+}
+
+function setBook2TrackGlobal(trackId) {
+  localStorage.setItem(BOOK2_TRACK_KEY, trackId);
+  renderTrackBar();
+  const letter = currentLetter();
+  if (letter) renderContextPane(letter.id);
+}
+
+function setBook2TrackLocal(letterId, trackId) {
+  localStorage.setItem(BOOK2_TRACK_LETTER_KEY(letterId), trackId);
+  renderTrackBar();
+  renderContextPane(letterId);
+}
+
+function renderTrackBar() {
+  const bar = document.getElementById('context-track-bar');
+  if (!bar) return;
+  const letter   = currentLetter();
+  const letterId = letter?.id;
+  const global   = localStorage.getItem(BOOK2_TRACK_KEY) || 'contextual';
+  const local    = letterId ? localStorage.getItem(BOOK2_TRACK_LETTER_KEY(letterId)) : null;
+  const active   = local || global;
+
+  bar.innerHTML = '';
+
+  // Global track pills
+  const globalRow = document.createElement('div');
+  globalRow.className = 'track-row track-row-global';
+  for (const t of BOOK2_TRACKS) {
+    if (!isEnabled('fiction-tracks') && t.id.startsWith('fiction')) continue;
+    const btn = document.createElement('button');
+    btn.className = 'track-pill' + (t.id === global ? ' global-active' : '') + (t.id === active ? ' active' : '');
+    btn.textContent = t.label;
+    btn.dataset.track = t.id;
+    btn.title = 'Set as default track';
+    btn.addEventListener('click', () => setBook2TrackGlobal(t.id));
+    globalRow.appendChild(btn);
+  }
+  bar.appendChild(globalRow);
+
+  // Per-letter override row (only if a letter is loaded)
+  if (letterId) {
+    const localRow = document.createElement('div');
+    localRow.className = 'track-row track-row-local';
+    const lbl = document.createElement('span');
+    lbl.className = 'track-override-label';
+    lbl.textContent = 'This letter:';
+    localRow.appendChild(lbl);
+    for (const t of BOOK2_TRACKS) {
+      if (!isEnabled('fiction-tracks') && t.id.startsWith('fiction')) continue;
+      const btn = document.createElement('button');
+      btn.className = 'track-pill track-pill-sm' + (t.id === local ? ' local-active' : '') + (t.id === active ? ' active' : '');
+      btn.textContent = t.label;
+      btn.dataset.track = t.id;
+      btn.title = local === t.id ? 'Clear this override' : 'Override for this letter';
+      btn.addEventListener('click', () => {
+        if (local === t.id) {
+          localStorage.removeItem(BOOK2_TRACK_LETTER_KEY(letterId));
+          renderTrackBar();
+          renderContextPane(letterId);
+        } else {
+          setBook2TrackLocal(letterId, t.id);
+        }
+      });
+      localRow.appendChild(btn);
+    }
+    bar.appendChild(localRow);
+  }
+}
+
+function renderContextPane(letterId) {
+  const track = getBook2Track(letterId);
+  if (track === 'fiction-gaps' || track === 'fiction-letters') {
+    renderFictionContent(track, letterId);
+  } else {
+    // show last activated entity entry, or letter-linked entries
+    const letter = letters.find(l => l.id === letterId);
+    const refs = letter?.contextRefs || [];
+    if (refs.length > 0) renderContextEntry(refs[0]);
+    else {
+      const container = document.getElementById('context-content');
+      container.innerHTML = '';
+      const p = document.createElement('p');
+      p.style.cssText = 'font-size:.75rem;color:var(--text-d);font-style:italic;margin-top:8px';
+      p.textContent = 'Click a highlighted word in the letter to open a context entry.';
+      container.appendChild(p);
+    }
+  }
+}
+
+function renderFictionContent(track, letterId) {
+  if (!isEnabled('fiction-tracks')) return;
+  const container = document.getElementById('context-content');
+  container.innerHTML = '';
+
+  // Fiction header
+  const badge = document.createElement('div');
+  badge.className = 'fiction-badge';
+  badge.textContent = 'FICTION';
+  container.appendChild(badge);
+  const disclaimer = document.createElement('p');
+  disclaimer.className = 'fiction-disclaimer';
+  disclaimer.textContent = 'Historical fiction — imaginative reconstruction, not fact';
+  container.appendChild(disclaimer);
+
+  let text = '';
+  let title = '';
+
+  if (track === 'fiction-gaps') {
+    const scene = fiction?.gap_scenes?.find(s => s.after_letter === letterId);
+    text  = scene?.text  || '';
+    title = scene?.title || '';
+  } else {
+    const reim = fiction?.letter_reimaginings?.find(r => r.letter_id === letterId);
+    text = reim?.text || '';
+  }
+
+  if (title) {
+    const h3 = document.createElement('h3');
+    h3.className = 'fiction-title';
+    h3.textContent = title;
+    container.appendChild(h3);
+  }
+
+  if (!text) {
+    const notice = document.createElement('p');
+    notice.style.cssText = 'font-size:.75rem;color:var(--text-d);font-style:italic;margin-top:8px';
+    notice.textContent = track === 'fiction-gaps'
+      ? 'No gap scene written yet for this letter.'
+      : 'No reimagining written yet for this letter.';
+    container.appendChild(notice);
+    return;
+  }
+
+  for (const para of text.split(/\n\n+/).filter(Boolean)) {
+    const p = document.createElement('p');
+    p.className = 'fiction-paragraph';
+    p.textContent = para;
+    container.appendChild(p);
+  }
+}
+
 function renderContextEntry(entryId) {
   const entry = contextIndex[entryId];
   if (!entry) return;
+
+  // Check if current track is fiction — if so, show fiction content instead
+  const letter   = currentLetter();
+  const track    = letter ? getBook2Track(letter.id) : 'contextual';
+  if (track === 'fiction-gaps' || track === 'fiction-letters') {
+    renderFictionContent(track, letter.id);
+    return;
+  }
+
   const container = document.getElementById('context-content');
   container.innerHTML = '';
   const h2 = document.createElement('h2');
@@ -351,12 +545,24 @@ function renderContextEntry(entryId) {
         container.appendChild(figure);
       });
   }
-  for (const para of entry.content || []) {
-    const p = document.createElement('p');
-    p.style.cssText =
-      'font-family:var(--book-font);font-size:.88rem;line-height:1.75;color:var(--text-m);margin-bottom:12px';
-    p.textContent = para.text;
-    container.appendChild(p);
+
+  // Read from the correct depth array (schema_version 3) or fall back to legacy `content`
+  const depthKey = `content_${track}`;
+  const content  = entry[depthKey] ?? entry.content_contextual ?? entry.content ?? [];
+
+  if (content.length === 0) {
+    const notice = document.createElement('p');
+    notice.style.cssText = 'font-size:.75rem;color:var(--text-d);font-style:italic;margin-top:8px';
+    notice.textContent = 'No entry written yet.';
+    container.appendChild(notice);
+  } else {
+    for (const para of content) {
+      const p = document.createElement('p');
+      p.style.cssText =
+        'font-family:var(--book-font);font-size:.88rem;line-height:1.75;color:var(--text-m);margin-bottom:12px';
+      p.textContent = para.text;
+      container.appendChild(p);
+    }
   }
   if (isEditorUnlocked()) {
     const mapEditor = renderMappingEditor(
@@ -663,7 +869,9 @@ function initTooltipPositioning() {
   document.querySelectorAll(sel).forEach((el) => {
     el.addEventListener('mouseenter', () => {
       const r = el.getBoundingClientRect();
-      const x = Math.round(r.left + r.width / 2);
+      const raw = r.left + r.width / 2;
+      // Clamp so tooltip (max ~200px wide, half = 100px) stays within viewport
+      const x = Math.round(Math.max(104, Math.min(window.innerWidth - 104, raw)));
       const bottom = Math.round(window.innerHeight - r.top + 8);
       el.style.setProperty('--tip-x', `${x}px`);
       el.style.setProperty('--tip-bottom', `${bottom}px`);
@@ -830,6 +1038,20 @@ function wireControls() {
     localStorage.setItem(LS('theme'), light ? 'dark' : 'light');
   });
   document.getElementById('btn-save').addEventListener('click', () => saveAll());
+
+  const editorIndicator = document.getElementById('editor-indicator');
+  if (editorIndicator) {
+    editorIndicator.style.display = 'inline';
+    editorIndicator.style.cursor = 'pointer';
+    editorIndicator.setAttribute('role', 'button');
+    editorIndicator.setAttribute('tabindex', '0');
+    editorIndicator.setAttribute('aria-pressed', 'false');
+    editorIndicator.title = 'Click to unlock inline editor (Shift+E)';
+    editorIndicator.addEventListener('click', toggleEditorMode);
+    editorIndicator.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEditorMode(); }
+    });
+  }
 
   const smartPanel = document.getElementById('smart-features-panel');
   document.getElementById('btn-smart').addEventListener('click', () => {

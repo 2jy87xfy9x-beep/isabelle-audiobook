@@ -1,5 +1,8 @@
 node_modules/
 .env
 
+# Generated export working files — edit locally, don't commit
+views-export/
+
 # Local Claude / Cursor permissions (machine-specific)
 .claude/settings.local.json

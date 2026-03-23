@@ -1,14 +1,16 @@
 const LS_POSITION = 'isabelle-v2-position';
 
 export async function loadData() {
-  const [bookRes, ctxRes] = await Promise.all([
+  const [bookRes, ctxRes, fictRes] = await Promise.all([
     fetch('./book.json'),
     fetch('./context.json'),
+    fetch('./fiction.json'),
   ]);
   if (!bookRes.ok) throw new Error('book_fetch_failed');
-  const book = await bookRes.json();
-  const context = ctxRes.ok ? await ctxRes.json() : { entries: [] };
-  return { book, context };
+  const book    = await bookRes.json();
+  const context = ctxRes.ok  ? await ctxRes.json()  : { entries: [] };
+  const fiction = fictRes.ok ? await fictRes.json() : { gap_scenes: [], letter_reimaginings: [] };
+  return { book, context, fiction };
 }
 
 export function resolvePosition(local, remote) {

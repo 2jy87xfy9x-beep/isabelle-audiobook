@@ -15,6 +15,8 @@ const FEATURES = [
   { id: 'view-memory', label: 'View Memory Per Letter' },
   { id: 'missing-letters', label: 'Missing Letter Indicators' },
   { id: 'page-lock', label: 'Page Lock' },
+  { id: 'letter-guardian', label: 'Letter Integrity Guardian' },
+  { id: 'fiction-tracks', label: 'Fiction Tracks' },
 ];
 
 export function isEnabled(id) {
@@ -146,4 +148,113 @@ function snapToNearestAnchor(el) {
   if (closest && closestDist < 80) {
     el.scrollTo({ top: closest.offsetTop - 20, behavior: 'smooth' });
   }
+}
+
+// ── Letter Integrity Guardian ─────────────────────────────────────────────────
+// Detects artefacts in letter text and returns annotated segments for rendering.
+// Same patterns as scripts/clean-letters.js — keep in sync if patterns change.
+
+const GUARDIAN_PATTERNS = [
+  {
+    id:     'header',
+    re:     /^Letter\s+\d+[\s\S]{0,20}?(?=[A-Z][a-z])/,
+    label:  'Header artefact',
+    tip:    'Extraction duplicate — "Letter N" prefix from source HTML',
+    cls:    'guardian-header',
+  },
+  {
+    id:     'folio',
+    re:     /\[(?:f|p)\.\s*[\d\w\-|,\s]+?\]/gi,
+    label:  'Folio reference',
+    tip:    'Archival folio ref — should be in metadata, not letter body',
+    cls:    'guardian-folio',
+  },
+  {
+    id:     'footnote',
+    re:     /(?<!\d)\d{1,2}\.\s+[A-ZÀÂÇÉÈÊËÎÏÔÙÛÜ].{10,}/g,
+    label:  'Historian footnote',
+    tip:    "Historian's editorial note — not Isabelle's writing; Book 2 candidate",
+    cls:    'guardian-footnote',
+  },
+  {
+    id:     'inline_marker',
+    re:     /[ \u00A0][1-9](?=[ ,;.!?»])/g,
+    label:  'Footnote marker',
+    tip:    'Superscript reference number pointing to an editorial footnote',
+    cls:    'guardian-marker',
+  },
+  {
+    id:     'ocr',
+    re:     /[|}{\\]/g,
+    label:  'OCR damage',
+    tip:    'Character that indicates OCR scanning damage — manual repair needed',
+    cls:    'guardian-ocr',
+  },
+];
+
+/**
+ * Analyse text and return array of { start, end, patternId, label, tip }.
+ * Ranges are character offsets into `text`.
+ */
+export function guardianAnalyse(text) {
+  if (!text) return [];
+  const hits = [];
+  for (const pat of GUARDIAN_PATTERNS) {
+    const re = new RegExp(pat.re.source, pat.re.flags.includes('g') ? pat.re.flags : pat.re.flags + 'g');
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      hits.push({ start: m.index, end: m.index + m[0].length, patternId: pat.id, label: pat.label, tip: pat.tip, cls: pat.cls });
+    }
+  }
+  // Sort by start position, remove overlaps (first match wins)
+  hits.sort((a, b) => a.start - b.start);
+  const merged = [];
+  let cursor = 0;
+  for (const h of hits) {
+    if (h.start >= cursor) { merged.push(h); cursor = h.end; }
+  }
+  return merged;
+}
+
+/**
+ * Wrap detected artefact ranges in <mark class="guardian-*"> elements inside `el`.
+ * Works on text nodes only — does not re-process already-wrapped nodes.
+ * Call after renderLetterBody when guardian is enabled.
+ */
+export function guardianHighlight(el, text, doc) {
+  if (!isEnabled('letter-guardian')) return;
+  const hits = guardianAnalyse(text);
+  if (!hits.length) return;
+
+  // Build annotated HTML from plain text + hit ranges
+  let html = '';
+  let cursor = 0;
+  function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  for (const h of hits) {
+    html += esc(text.slice(cursor, h.start));
+    html += `<mark class="guardian-flag ${h.cls}" title="${esc(h.tip)}" aria-label="${esc(h.label)}: ${esc(h.tip)}">${esc(text.slice(h.start, h.end))}</mark>`;
+    cursor = h.end;
+  }
+  html += esc(text.slice(cursor));
+
+  // Replace the first paragraph's text node with the annotated HTML
+  // (guardian applies to the raw concatenated text, injected into the first <p>)
+  const firstP = el.querySelector('.letter-paragraph');
+  if (firstP) {
+    const wrapper = doc.createElement('span');
+    wrapper.innerHTML = html;
+    firstP.innerHTML = '';
+    firstP.appendChild(wrapper);
+  }
+}
+
+/**
+ * Return a plain-text summary of all issues in a letter for the editor banner.
+ */
+export function guardianSummary(text) {
+  const hits = guardianAnalyse(text);
+  if (!hits.length) return null;
+  const counts = {};
+  for (const h of hits) counts[h.label] = (counts[h.label] || 0) + 1;
+  return Object.entries(counts).map(([k, v]) => `${v}× ${k}`).join(' · ');
 }

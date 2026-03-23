@@ -89,6 +89,29 @@
     .photocopy-fallback{background:rgba(245,240,230,0.04);padding:24px}
     .photocopy-notice{font-size:.72rem;color:var(--text-d);margin-bottom:16px;font-family:var(--ui-font)}
     .view-missing{color:var(--text-d);font-family:var(--ui-font);font-size:.8rem;font-style:italic}
+    .guardian-flag{border-radius:2px;cursor:help;text-decoration:underline wavy}
+    .guardian-header{background:rgba(255,80,80,.18);text-decoration-color:#f55}
+    .guardian-folio{background:rgba(255,180,0,.18);text-decoration-color:#fb0}
+    .guardian-footnote{background:rgba(80,160,255,.18);text-decoration-color:#5af}
+    .guardian-marker{background:rgba(180,80,255,.18);text-decoration-color:#c6f}
+    .guardian-ocr{background:rgba(255,80,80,.35);text-decoration-color:#f00;font-weight:bold}
+    .guardian-banner{font-family:var(--ui-font);font-size:.72rem;color:#f90;padding:6px 10px;border-left:2px solid #f90;margin-bottom:12px;line-height:1.4}
+
+    /* ── Book 2 track bar ────────────────────────────────────────── */
+    #context-track-bar{padding:10px 12px 6px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+    .track-row{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+    .track-override-label{font-family:var(--ui-font);font-size:.6rem;color:var(--text-d);text-transform:uppercase;letter-spacing:.04em;margin-right:2px;white-space:nowrap}
+    .track-pill{font-family:var(--ui-font);font-size:.65rem;padding:3px 8px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-d);cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+    .track-pill:hover{background:var(--border);color:var(--text-m)}
+    .track-pill.global-active{border-color:var(--accent);color:var(--accent)}
+    .track-pill.local-active{border-color:var(--accent);background:var(--accent);color:#000}
+    .track-pill-sm{font-size:.58rem;padding:2px 6px}
+
+    /* ── Fiction visual treatment ────────────────────────────────── */
+    .fiction-badge{font-family:var(--ui-font);font-size:.6rem;font-weight:700;letter-spacing:.08em;color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:1px 6px;display:inline-block;margin-bottom:6px}
+    .fiction-disclaimer{font-family:var(--ui-font);font-size:.62rem;color:var(--text-d);font-style:italic;margin-bottom:14px;line-height:1.4}
+    .fiction-title{font-family:var(--book-font);font-size:.82rem;font-weight:600;color:var(--text-m);margin-bottom:10px;font-style:italic}
+    .fiction-paragraph{font-family:var(--book-font);font-size:.88rem;line-height:1.8;color:var(--text-m);margin-bottom:12px;font-style:italic}
 
     body.page-mode #letter-content{overflow:hidden;display:flex;scroll-snap-type:x mandatory}
     body.page-mode .letter-page{min-width:100%;scroll-snap-align:start;padding:48px 60px 40px}
@@ -210,8 +233,8 @@
     .range-banner{display:none;position:fixed;bottom:52px;left:50%;transform:translateX(-50%);background:var(--surf);border:1px solid var(--accent);color:var(--text-m);font-family:var(--ui-font);font-size:.62rem;padding:8px 16px;z-index:50;white-space:nowrap}
     body.range-mode .range-banner{display:block}
 
-    #editor-indicator{display:none;font-size:.56rem;letter-spacing:.1em;color:var(--accent);font-family:var(--ui-font)}
-    body.editor-mode #editor-indicator{display:inline}
+    #editor-indicator{display:inline;font-size:.56rem;letter-spacing:.1em;color:var(--text-d);font-family:var(--ui-font);opacity:.45;transition:color var(--t),opacity var(--t)}
+    #editor-indicator.active,body.editor-mode #editor-indicator{color:var(--accent);opacity:1}
 
     @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
     @media(prefers-contrast:more){:root{--border:rgba(198,123,165,0.5)}}
@@ -256,6 +279,7 @@
     <div class="resize-gutter" id="gutter-context" role="separator" aria-orientation="vertical" aria-label="Resize context panel" tabindex="0"></div>
 
     <aside id="context-pane" class="collapsed" aria-label="Context panel">
+      <div id="context-track-bar" aria-label="Book 2 track selector"></div>
       <div id="context-content"></div>
     </aside>
   </div>
