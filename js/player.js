@@ -41,7 +41,7 @@ export class Player {
   }
 
   setIndex(index) {
-    this.currentIndex = Math.max(0, Math.min(index, this.totalParagraphs - 1));
+    this.currentIndex = Math.max(0, Math.min(index, Math.max(0, this.totalParagraphs - 1)));
   }
 
   play() {

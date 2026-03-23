@@ -13,14 +13,15 @@ export function setMode(mode) {
 
 export function applyMode(index) {
   _currentIndex = index;
-  if (_currentMode === 'off') return;
 
   const els = Array.from(document.querySelectorAll('.para'));
 
-  // Clear all focus classes first
+  // Always clear focus classes first (even when switching to 'off')
   els.forEach(el => {
     el.classList.remove('hidden', 'fade-near');
   });
+
+  if (_currentMode === 'off') return;
 
   if (_currentMode === 'reveal') {
     els.forEach((el, i) => {
