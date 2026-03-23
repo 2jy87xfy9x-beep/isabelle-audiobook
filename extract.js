@@ -15,7 +15,7 @@ function cleanHtml(raw) {
   // Strip all remaining HTML tags
   t = t.replace(/<[^>]+>/g, ' ');
   // Strip noise markers
-  t = t.replace(/Leaming reading speed \d+%/g, '');
+  t = t.replace(/Leaming\s+reading\s+\S*/g, '');
   t = t.replace(/\d+ minutes? left in chapter \d+%/gi, '');
   t = t.replace(/\d+ minute ago left in chapter \d+%/gi, '');
   t = t.replace(/\d+ minute\(s\) left in chapter \d+%/gi, '');
@@ -57,6 +57,7 @@ for (const p of pMatches) {
 
 const paragraphs = rawTexts
   .filter(t => t.length >= 20)
+  .filter(t => !t.includes('Go to most recent page'))
   .map((text, i) => ({
     id: i + 1,
     text,
