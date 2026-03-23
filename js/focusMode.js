@@ -1,43 +1,54 @@
-// js/focusMode.js
-// Manages the 4 focus modes by toggling CSS classes on paragraph elements.
-
-let _currentMode = 'off';
+let _mode = 'off';
 let _currentIndex = 0;
+let _paragraphEls = [];
+
+export function initFocusMode(paragraphEls) {
+  _paragraphEls = paragraphEls || [];
+}
 
 export function setMode(mode) {
-  _currentMode = mode;
-  const book = document.getElementById('book');
-  book.dataset.focus = mode === 'off' ? '' : mode;
+  _mode = mode;
   applyMode(_currentIndex);
+}
+
+export function getMode() {
+  return _mode;
 }
 
 export function applyMode(index) {
   _currentIndex = index;
-
-  const els = Array.from(document.querySelectorAll('.para'));
-
-  // Always clear focus classes first (even when switching to 'off')
-  els.forEach(el => {
-    el.classList.remove('hidden', 'fade-near');
-  });
-
-  if (_currentMode === 'off') return;
-
-  if (_currentMode === 'reveal') {
-    els.forEach((el, i) => {
-      if (i > index) el.classList.add('hidden');
+  if (_mode === 'off') {
+    _paragraphEls.forEach((el) => {
+      el.style.opacity = '';
+      el.style.display = '';
+    });
+    return;
+  }
+  if (_mode === 'reveal') {
+    _paragraphEls.forEach((el, i) => {
+      el.style.display = i <= index ? '' : 'none';
+      el.style.opacity = '';
+    });
+    return;
+  }
+  if (_mode === 'spotlight') {
+    _paragraphEls.forEach((el, i) => {
+      el.style.display = i === index ? '' : 'none';
+      el.style.opacity = '';
+    });
+    return;
+  }
+  if (_mode === 'fade_ahead') {
+    _paragraphEls.forEach((el, i) => {
+      el.style.display = i <= index + 3 ? '' : 'none';
+      el.style.opacity = i === index ? '1' : i <= index + 3 ? '0.15' : '0';
+    });
+    return;
+  }
+  if (_mode === 'page') {
+    _paragraphEls.forEach((el) => {
+      el.style.opacity = '';
+      el.style.display = '';
     });
   }
-  // spotlight and fade-ahead are handled purely by CSS (.current class + data-focus attribute)
-  // fade-ahead needs the fade-near class on the next 3 paragraphs
-  if (_currentMode === 'fade-ahead') {
-    els.forEach((el, i) => {
-      const dist = i - index;
-      if (dist > 0 && dist <= 3) el.classList.add('fade-near');
-    });
-  }
-}
-
-export function getMode() {
-  return _currentMode;
 }
