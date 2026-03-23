@@ -99,6 +99,7 @@ export function renderLetterBody(letter, activeView, sortedAliases, doc) {
   const article = doc.createElement('article');
   article.className = 'letter-body';
   article.dataset.letterId = letter.id;
+  article.dataset.view = activeView;
 
   if (activeView === 'photocopy') {
     renderPhotocopy(letter, article, doc);
