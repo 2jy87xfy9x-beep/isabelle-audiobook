@@ -86,7 +86,7 @@ export function renderViewSwitcher(letter, activeView, onSwitch, doc) {
     btn.setAttribute('role', 'tab');
     btn.dataset.view = key;
     btn.textContent = tab;
-    btn.title = tip;
+    btn.dataset.tip = tip;
     btn.setAttribute('aria-selected', key === activeView ? 'true' : 'false');
     if (key === activeView) btn.classList.add('active');
     btn.addEventListener('click', () => onSwitch(key));

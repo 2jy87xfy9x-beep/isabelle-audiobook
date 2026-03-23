@@ -319,7 +319,7 @@ function buildSidebar() {
         ? `${letter.letter_number}. ${letter.date_display}`
         : `${letter.letter_number}. — not yet added`;
       if (!letter.complete) btn.disabled = true;
-      btn.title = btn.textContent;
+      btn.dataset.tip = btn.textContent;
       btn.addEventListener('click', () => {
         goToLetter(letters.indexOf(letter));
         closeSidebar();
@@ -398,7 +398,7 @@ function renderTrackBar() {
     btn.className = 'track-pill' + (t.id === global ? ' global-active' : '') + (t.id === active ? ' active' : '');
     btn.textContent = t.label;
     btn.dataset.track = t.id;
-    btn.title = 'Set as default track';
+    btn.dataset.tip = 'Set as default track';
     btn.addEventListener('click', () => setBook2TrackGlobal(t.id));
     globalRow.appendChild(btn);
   }
@@ -418,7 +418,7 @@ function renderTrackBar() {
       btn.className = 'track-pill track-pill-sm' + (t.id === local ? ' local-active' : '') + (t.id === active ? ' active' : '');
       btn.textContent = t.label;
       btn.dataset.track = t.id;
-      btn.title = local === t.id ? 'Clear this override' : 'Override for this letter';
+      btn.dataset.tip = local === t.id ? 'Clear this override' : 'Override for this letter';
       btn.addEventListener('click', () => {
         if (local === t.id) {
           localStorage.removeItem(BOOK2_TRACK_LETTER_KEY(letterId));
@@ -859,24 +859,31 @@ function initBottomBarResize() {
 }
 
 function initTooltipPositioning() {
-  const sel = [
-    '#bottom-bar .bar-tip',
-    '#pull-strip.bar-tip',
-    '#sidebar-reveal.bar-tip',
-    '#sidebar .sidebar-collapse-btn.bar-tip',
-    '#bottom-bar .bar-tip-wrap-select',
-  ].join(',');
-  document.querySelectorAll(sel).forEach((el) => {
-    el.addEventListener('mouseenter', () => {
-      const r = el.getBoundingClientRect();
-      const raw = r.left + r.width / 2;
-      // Clamp so tooltip (max ~200px wide, half = 100px) stays within viewport
-      const x = Math.round(Math.max(104, Math.min(window.innerWidth - 104, raw)));
-      const bottom = Math.round(window.innerHeight - r.top + 8);
-      el.style.setProperty('--tip-x', `${x}px`);
-      el.style.setProperty('--tip-bottom', `${bottom}px`);
-      el.style.setProperty('--tip-arrow', `${bottom - 10}px`);
-    });
+  const tip = document.getElementById('app-tooltip');
+  if (!tip) return;
+  let hideTimer = null;
+
+  document.addEventListener('mouseover', (e) => {
+    const el = e.target.closest('[data-tip]');
+    clearTimeout(hideTimer);
+    if (!el?.dataset.tip) {
+      tip.classList.remove('visible');
+      return;
+    }
+    tip.textContent = el.dataset.tip;
+    const r = el.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const x = Math.round(Math.max(110, Math.min(window.innerWidth - 110, cx)));
+    // Show above the element
+    const bottom = Math.round(window.innerHeight - r.top + 10);
+    tip.style.left = `${x}px`;
+    tip.style.bottom = `${bottom}px`;
+    tip.classList.add('visible');
+  });
+
+  document.addEventListener('mouseout', (e) => {
+    if (!e.target.closest('[data-tip]')) return;
+    hideTimer = setTimeout(() => tip.classList.remove('visible'), 80);
   });
 }
 
@@ -1046,7 +1053,7 @@ function wireControls() {
     editorIndicator.setAttribute('role', 'button');
     editorIndicator.setAttribute('tabindex', '0');
     editorIndicator.setAttribute('aria-pressed', 'false');
-    editorIndicator.title = 'Click to unlock inline editor (Shift+E)';
+    editorIndicator.dataset.tip = 'Click to unlock inline editor (Shift+E)';
     editorIndicator.addEventListener('click', toggleEditorMode);
     editorIndicator.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEditorMode(); }

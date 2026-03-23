@@ -232,7 +232,7 @@ export function guardianHighlight(el, text, doc) {
   function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   for (const h of hits) {
     html += esc(text.slice(cursor, h.start));
-    html += `<mark class="guardian-flag ${h.cls}" title="${esc(h.tip)}" aria-label="${esc(h.label)}: ${esc(h.tip)}">${esc(text.slice(h.start, h.end))}</mark>`;
+    html += `<mark class="guardian-flag ${h.cls}" data-tip="${esc(h.tip)}" aria-label="${esc(h.label)}: ${esc(h.tip)}">${esc(text.slice(h.start, h.end))}</mark>`;
     cursor = h.end;
   }
   html += esc(text.slice(cursor));

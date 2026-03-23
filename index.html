@@ -177,49 +177,21 @@
     #bottom-bar .bar-tip-speed{gap:6px}
     #bottom-bar .bar-tip,#pull-strip.bar-tip,#sidebar-reveal.bar-tip,#sidebar .sidebar-collapse-btn.bar-tip{position:relative;display:inline-flex;align-items:center;vertical-align:middle}
     #pull-strip.bar-tip,#sidebar-reveal.bar-tip{display:block}
-    #bottom-bar .bar-tip::before,#pull-strip.bar-tip::before,#sidebar-reveal.bar-tip::before,#sidebar .sidebar-collapse-btn.bar-tip::before{
-      content:attr(data-tip);
-      position:fixed;left:var(--tip-x,-9999px);bottom:var(--tip-bottom,60px);transform:translateX(-50%);
-      padding:4px 8px;max-width:min(200px,55vw);width:max-content;text-align:center;white-space:normal;
-      font-family:var(--ui-font);font-size:.63rem;line-height:1.3;font-weight:500;letter-spacing:.02em;
-      color:var(--text);background:var(--surf2);border:1px solid var(--border-hi);
-      border-radius:5px;box-shadow:0 3px 10px rgba(0,0,0,.3);
-      opacity:0;visibility:hidden;pointer-events:none;z-index:200
-    }
-    #bottom-bar .bar-tip::after,#pull-strip.bar-tip::after,#sidebar-reveal.bar-tip::after,#sidebar .sidebar-collapse-btn.bar-tip::after{
-      content:'';position:fixed;left:var(--tip-x,-9999px);bottom:var(--tip-arrow,48px);transform:translateX(-50%);
-      border:5px solid transparent;border-top-color:var(--border-hi);
-      opacity:0;visibility:hidden;pointer-events:none;z-index:201
-    }
-    #bottom-bar .bar-tip:hover::before,#bottom-bar .bar-tip:hover::after,
-    #pull-strip.bar-tip:hover::before,#pull-strip.bar-tip:hover::after,
-    #sidebar-reveal.bar-tip:hover::before,#sidebar-reveal.bar-tip:hover::after,
-    #sidebar .sidebar-collapse-btn.bar-tip:hover::before,#sidebar .sidebar-collapse-btn.bar-tip:hover::after,
-    #bottom-bar .bar-tip:focus-within::before,#bottom-bar .bar-tip:focus-within::after,
-    #pull-strip.bar-tip:focus-visible::before,#pull-strip.bar-tip:focus-visible::after,
-    #sidebar-reveal.bar-tip:focus-visible::before,#sidebar-reveal.bar-tip:focus-visible::after,
-    #sidebar .sidebar-collapse-btn.bar-tip:focus-visible::before,#sidebar .sidebar-collapse-btn.bar-tip:focus-visible::after,
-    #bottom-bar button.bar-tip:focus-visible::before,#bottom-bar button.bar-tip:focus-visible::after{
-      opacity:1;visibility:visible
-    }
     #bottom-bar .bar-tip-wrap-select{display:inline-flex;align-items:center;position:relative;vertical-align:middle}
-    #bottom-bar .bar-tip-wrap-select::before{
-      content:attr(data-tip);
-      position:fixed;left:var(--tip-x,-9999px);bottom:var(--tip-bottom,60px);transform:translateX(-50%);
-      padding:4px 8px;max-width:min(200px,55vw);width:max-content;text-align:center;white-space:normal;
+    /* ── Universal tooltip ───────────────────────────────────────── */
+    #app-tooltip{
+      position:fixed;z-index:300;
+      padding:4px 8px;max-width:min(260px,55vw);width:max-content;text-align:center;white-space:normal;
       font-family:var(--ui-font);font-size:.63rem;line-height:1.3;font-weight:500;letter-spacing:.02em;
       color:var(--text);background:var(--surf2);border:1px solid var(--border-hi);
       border-radius:5px;box-shadow:0 3px 10px rgba(0,0,0,.3);
-      opacity:0;visibility:hidden;pointer-events:none;z-index:200
+      transform:translateX(-50%);
+      opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s ease
     }
-    #bottom-bar .bar-tip-wrap-select::after{
-      content:'';position:fixed;left:var(--tip-x,-9999px);bottom:var(--tip-arrow,48px);transform:translateX(-50%);
+    #app-tooltip.visible{opacity:1;visibility:visible}
+    #app-tooltip::after{
+      content:'';position:absolute;left:50%;top:100%;transform:translateX(-50%);
       border:5px solid transparent;border-top-color:var(--border-hi);
-      opacity:0;visibility:hidden;pointer-events:none;z-index:201
-    }
-    #bottom-bar .bar-tip-wrap-select:hover::before,#bottom-bar .bar-tip-wrap-select:hover::after,
-    #bottom-bar .bar-tip-wrap-select:focus-within::before,#bottom-bar .bar-tip-wrap-select:focus-within::after{
-      opacity:1;visibility:visible
     }
     .pull-strip{display:none;height:4px;background:linear-gradient(180deg,var(--accent-dim),var(--accent));cursor:pointer;opacity:.55;flex-shrink:0;transition:opacity var(--t)}
     .pull-strip:hover{opacity:1}
@@ -279,6 +251,7 @@
   </style>
 </head>
 <body>
+<div id="app-tooltip" aria-hidden="true"></div>
 <div id="app">
   <div id="sidebar-reveal" class="bar-tip" role="button" tabindex="0" aria-label="Show letter list" data-tip="Show letter list"></div>
   <nav id="sidebar" aria-label="Navigation">
