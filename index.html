@@ -566,7 +566,11 @@ async function loadFromIDB(id) {
   const entry = await getBook(id);
   if (!entry) throw new Error('book_not_found');
 
-  const perm = await entry.handle.requestPermission({ mode: 'readwrite' });
+  // Use queryPermission (no gesture needed) — requestPermission is called earlier
+  // in the bookshelf card click handler where a user gesture is available.
+  let perm;
+  try { perm = await entry.handle.queryPermission({ mode: 'readwrite' }); }
+  catch { throw new Error('permission_denied'); }
   if (perm !== 'granted') throw new Error('permission_denied');
 
   _bookHandle = await entry.handle.getFileHandle('book.json');
