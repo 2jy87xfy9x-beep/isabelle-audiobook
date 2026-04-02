@@ -537,7 +537,7 @@ async function loadData() {
   }
   // HTTP — fetch from root or named subdirectory
   const dir = params.get('dir');
-  const base = dir && dir !== '.' ? `./${dir}` : '.';
+  const base = dir ? `./${dir}` : './data';
   const [bookRes, ctxRes, fictRes] = await Promise.all([
     fetch(`${base}/book.json`),
     fetch(`${base}/context.json`),
