@@ -536,6 +536,14 @@ async function loadData() {
     if (books.length === 0)
       throw Object.assign(new Error('no_books'), { code: 'no_books' });
     const recent = books.sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0))[0];
+    // requestPermission() requires a user gesture — check first without prompting.
+    // If already granted (e.g. "Allow on every visit"), load silently.
+    // If not, open the bookshelf so the user clicks the card (gesture) to grant.
+    let perm;
+    try { perm = await recent.handle.queryPermission({ mode: 'readwrite' }); }
+    catch { perm = 'prompt'; }
+    if (perm !== 'granted')
+      throw Object.assign(new Error('no_books'), { code: 'no_books' });
     history.replaceState(null, '', `?id=${encodeURIComponent(recent.id)}`);
     return loadFromIDB(recent.id);
   }
