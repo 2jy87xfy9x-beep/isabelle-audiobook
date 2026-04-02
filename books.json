@@ -1,0 +1,11 @@
+{
+  "books": [
+    {
+      "id": "isabelle",
+      "title": "Isabelle — Letters",
+      "subtitle": "A Collection of Letters",
+      "author": "Isabelle de Bourbon-Parma",
+      "dir": "."
+    }
+  ]
+}
