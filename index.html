@@ -209,6 +209,23 @@
     .export-btn{background:none;border:1px solid var(--border);color:var(--text-m);font-family:var(--ui-font);font-size:.62rem;padding:5px 10px;cursor:pointer;transition:all var(--t)}
     .export-btn.active,.export-btn:hover{background:var(--accent-dim);color:var(--text);border-color:var(--accent)}
 
+    #bookshelf-panel{position:fixed;bottom:52px;right:20px;background:var(--surf);border:1px solid var(--border);padding:20px 24px;z-index:50;display:none;min-width:300px;max-height:70vh;overflow-y:auto}
+    #bookshelf-panel.open{display:block}
+    .bs-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .bs-title{font-family:var(--ui-font);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+    .bs-add-btn{background:none;border:1px solid var(--border);color:var(--text-m);font-family:var(--ui-font);font-size:.62rem;padding:5px 10px;cursor:pointer;transition:all var(--t)}
+    .bs-add-btn:hover{color:var(--text);border-color:var(--accent);background:var(--accent-bg)}
+    .bs-card{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer}
+    .bs-card:last-child{border-bottom:none}
+    .bs-card:hover .bs-card-title{color:var(--accent)}
+    .bs-card-info{flex:1;min-width:0}
+    .bs-card-title{font-family:var(--book-font);font-size:.88rem;color:var(--text);transition:color var(--t);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .bs-card-author{font-family:var(--ui-font);font-size:.62rem;color:var(--text-d);margin-top:2px}
+    .bs-card-badge{font-family:var(--ui-font);font-size:.56rem;color:var(--accent);margin-top:4px}
+    .bs-card-remove{background:none;border:none;color:var(--text-d);cursor:pointer;font-size:.8rem;padding:2px 4px;transition:color var(--t);flex-shrink:0}
+    .bs-card-remove:hover{color:#f55}
+    .bs-empty{font-family:var(--ui-font);font-size:.72rem;color:var(--text-d);font-style:italic;text-align:center;padding:16px 0}
+
     #inline-toolbar{position:fixed;display:none;gap:6px;background:var(--surf);border:1px solid var(--border);padding:6px 10px;z-index:60}
     #inline-toolbar button{background:none;border:none;color:var(--text-m);cursor:pointer;font-family:var(--ui-font);font-size:.78rem;padding:3px 6px;transition:color var(--t)}
     #inline-toolbar button:hover{color:var(--accent)}
@@ -305,9 +322,12 @@
     <button type="button" class="bar-icon bar-tip" id="btn-focus" aria-label="Reading mode" data-tip="Cycle reading focus: off → reveal → spotlight → fade ahead → page view">⊞</button>
     <button type="button" class="bar-icon bar-tip" id="btn-context" aria-label="Context panel" data-tip="Show or hide the context / references panel">📖</button>
     <button type="button" class="bar-icon bar-tip" id="btn-sidebar" aria-label="Navigation" data-tip="Show or hide the letter list">≡</button>
+    <button type="button" class="bar-icon bar-tip" id="btn-bookshelf" aria-label="Bookshelf" data-tip="Switch book or add a new one">📚</button>
     <button type="button" class="bar-icon bar-tip" id="btn-export" aria-label="Export" data-tip="Export letter or book (HTML, print, plain text)">↓</button>
     <button type="button" class="bar-icon bar-tip" id="btn-smart" aria-label="Smart features" data-tip="Smart scroll and navigation options">✦</button>
     <button type="button" class="bar-icon bar-tip" id="btn-save" aria-label="Save" data-tip="Save book and context to GitHub (needs token)">💾</button>
+    <button type="button" class="bar-icon bar-tip" id="btn-snapshot" aria-label="Save place" data-tip="Download a snapshot to save your reading position">⤓</button>
+    <label class="bar-icon bar-tip" id="btn-restore-label" aria-label="Restore place" data-tip="Restore your reading position from a snapshot file" style="cursor:pointer">⤒<input type="file" accept=".json" id="restore-input" style="display:none;position:absolute"></label>
     <button type="button" class="bar-icon bar-collapse bar-tip" id="btn-bottom-collapse" aria-label="Hide controls" data-tip="Hide this bar (shortcut: Shift+H)">▽</button>
     <span id="editor-indicator" class="bar-tip" aria-label="Editor mode active" data-tip="Inline editor is unlocked — tap text to edit">🖉</span>
   </div>
@@ -320,6 +340,13 @@
 <div id="ctx-sync-dot" aria-hidden="true"></div>
 <div id="smart-features-panel" role="dialog" aria-label="Smart Features" aria-modal="true" tabindex="-1"></div>
 <div id="export-panel" role="dialog" aria-label="Export"></div>
+<div id="bookshelf-panel" role="dialog" aria-label="Bookshelf" aria-modal="true" tabindex="-1">
+  <div class="bs-header">
+    <span class="bs-title">Library</span>
+    <button type="button" class="bs-add-btn" id="bs-btn-add">+ Add book</button>
+  </div>
+  <div id="bs-list"></div>
+</div>
 <div id="inline-toolbar" role="toolbar" aria-label="Format">
   <button type="button" onclick="window._editor?.applyInlineFormat('bold')" aria-label="Bold">B</button>
   <button type="button" onclick="window._editor?.applyInlineFormat('italic')" aria-label="Italic"><em>I</em></button>
