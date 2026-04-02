@@ -2953,6 +2953,7 @@ function wireControls() {
   const smartPanel = document.getElementById('smart-features-panel');
   document.getElementById('btn-smart').addEventListener('click', () => {
     closeBookshelf();
+    document.getElementById('export-panel').classList.remove('open');
     smartPanel.classList.toggle('open');
     if (smartPanel.classList.contains('open')) smartPanel.focus();
   });
@@ -3005,6 +3006,7 @@ function wireControls() {
 
   document.getElementById('btn-export').addEventListener('click', () => {
     closeBookshelf();
+    smartPanel.classList.remove('open');
     document.getElementById('export-panel').classList.toggle('open');
   });
   buildExportPanel();
