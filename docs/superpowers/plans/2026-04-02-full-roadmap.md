@@ -35,12 +35,31 @@
 
 The original five-phase plan (A–E) assumed a local Flask server running Kokoro TTS and Coqui voice cloning. That approach is being replaced with a **serverless-first architecture**: ElevenLabs API for voice cloning and synthesis, a thin Cloudflare Worker to proxy API keys, and direct browser API calls for translation. Several modules from the LPAG project (pledge, signed records, editor, streaks) are directly adaptable here.
 
-**Stack:** Vanilla ES modules · Web Audio API · ElevenLabs API · Cloudflare Worker + D1 · Stripe API · File System Access API
+**Stack:** Vanilla ES modules · Web Audio API · ElevenLabs API · Cloudflare Worker + D1 · Stripe API
 
 **What was scrapped:**
 - Phase B (Flask TTS server) — replaced by ElevenLabs API + Worker proxy
 - Phase E (Coqui voice clone UI) — replaced by ElevenLabs instant voice clone
 - Phase C (dual-engine browser/Kokoro toggle) — simplified to single ElevenLabs engine
+- File System Access API (`showDirectoryPicker`, `requestPermission`) — replaced by `<input type="file">` bundle approach (no permissions required)
+
+---
+
+## Completed — Foundation
+
+### F1 — Single-File Consolidation + Bookshelf Panel
+
+**Status: ✅ Complete** · *April 2, 2026* · See `docs/reports/2026-04-02-single-file-consolidation-report.md`
+
+All 14 JS modules and `landing.html` collapsed into a single `index.html` with one inline `<script type="module">`. The separate landing page is replaced by an in-reader bookshelf panel (📚 in bottom bar).
+
+**Key decisions made:**
+- Books loaded via `<input type="file">` — zero browser permissions needed
+- Book data stored in IndexedDB as a bundle `{ book, context, fiction }` — no file handles
+- Saving = browser download of updated bundle `.json` (user pushes to git manually)
+- `data/` folder created for all JSON files; `docs/` reorganised; README rewritten
+
+**Architecture impact on R1–R5:** The inline-script architecture means new feature modules (voice, sound, translate, etc.) will be added as additional `// ── §N NAME ──` sections inside the single `<script type="module">` in `index.html`, rather than separate `js/*.js` files. The roadmap file references below (`js/sound.js`, `js/voice.js`, etc.) reflect intended logical modules — they will live as named sections in the inline script unless the file grows unmanageable, at which point splitting back out is straightforward.
 
 ---
 
@@ -641,18 +660,21 @@ LPAG's brief modal is 8 slides, auto-advances every 4 seconds, pauses on hover, 
 ## Architecture Overview
 
 ```
-[Browser]
+[Browser — index.html, single inline <script type="module">]
     │
-    ├── js/app.js ──────────────────── orchestrator
-    ├── js/player.js ─────────────── letter playback (existing)
-    ├── js/renderer.js ───────────── letter render (existing)
-    ├── js/sound.js ──────────────── SoundPlayer (R1)
-    ├── js/voice.js ──────────────── VoicePlayer — ElevenLabs (R2)
-    ├── js/translate.js ──────────── TranslatePanel (R4)
-    ├── js/voice-settings.js ─────── settings drawer + clone recording (R5)
-    ├── js/snapshot.js ───────────── read state snapshot (L1)
-    ├── js/flairs.js ─────────────── flair presets (O1, optional)
-    └── assets/sounds/*.wav ──────── sound effects (R1)
+    ├── §1  DB ──────────────────────── IDB persistence (✅ complete)
+    ├── §3  LOADER ──────────────────── bundle load / IDB fetch (✅ complete)
+    ├── §4  RENDERER ────────────────── letter render (✅ complete)
+    ├── §5  PLAYER ──────────────────── letter playback (✅ complete)
+    ├── §13 BOOKSHELF ───────────────── in-reader book switcher (✅ complete)
+    ├── §14 APP ─────────────────────── orchestrator (✅ complete)
+    ├── §N  SOUND ───────────────────── SoundPlayer (R1, planned)
+    ├── §N  VOICE ───────────────────── VoicePlayer — ElevenLabs (R2, planned)
+    ├── §N  TRANSLATE ───────────────── TranslatePanel (R4, planned)
+    ├── §N  VOICE-SETTINGS ──────────── settings drawer + clone (R5, planned)
+    ├── §N  SNAPSHOT ────────────────── read state snapshot (L1, planned)
+    ├── §N  FLAIRS ──────────────────── flair presets (O1, optional)
+    └── assets/sounds/*.wav ──────────── sound effects (R1, planned)
     │
     └── POST/GET ──► Cloudflare Worker (R3)
                           │
