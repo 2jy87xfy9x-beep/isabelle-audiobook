@@ -1,0 +1,497 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+#sky-wrap{position:relative;width:100%;height:680px;overflow:hidden;background:#000008;cursor:default}
+canvas{position:absolute;inset:0;width:100%;height:100%}
+#hud{position:absolute;top:16px;left:0;right:0;display:flex;justify-content:center;gap:8px;z-index:20;pointer-events:none}
+.hud-pill{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:rgba(200,185,230,0.45);font-family:Georgia,serif;border:0.5px solid rgba(200,185,230,0.12);padding:3px 10px;border-radius:20px}
+#back-btn{position:absolute;top:14px;left:16px;z-index:30;display:none;background:none;border:0.5px solid rgba(200,185,230,0.25);color:rgba(200,185,230,0.7);font-family:Georgia,serif;font-size:11px;padding:4px 12px;border-radius:20px;cursor:pointer;letter-spacing:.08em}
+#back-btn:hover{border-color:rgba(200,185,230,0.6);color:rgba(200,185,230,1)}
+#tooltip{position:absolute;pointer-events:none;z-index:40;display:none;background:rgba(8,4,16,0.92);border:0.5px solid rgba(200,185,230,0.2);border-radius:10px;padding:12px 16px;max-width:220px}
+#tooltip h3{font-family:Georgia,serif;font-size:13px;color:#f0e8ff;font-weight:400;margin-bottom:4px}
+#tooltip p{font-size:11px;color:rgba(200,185,230,0.65);line-height:1.6;font-family:Georgia,serif}
+#tooltip .open-btn{margin-top:8px;display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(220,180,255,0.8);border:0.5px solid rgba(220,180,255,0.3);padding:4px 10px;border-radius:20px;text-align:center;background:none;cursor:pointer;font-family:Georgia,serif;width:100%}
+#tooltip .open-btn:hover{color:#fff;border-color:rgba(220,180,255,0.8)}
+</style>
+
+<div id="sky-wrap">
+  <canvas id="bg-canvas"></canvas>
+  <canvas id="main-canvas"></canvas>
+  <div id="hud">
+    <span class="hud-pill">Eras</span>
+    <span class="hud-pill">·</span>
+    <span class="hud-pill">Regions</span>
+    <span class="hud-pill">·</span>
+    <span class="hud-pill">Themes</span>
+  </div>
+  <button id="back-btn">← back to sky</button>
+  <div id="tooltip">
+    <h3 id="tt-title"></h3>
+    <p id="tt-desc"></p>
+    <button class="open-btn" id="tt-open">Open book →</button>
+  </div>
+</div>
+
+<script>
+const W_EL = document.getElementById('sky-wrap');
+const BG = document.getElementById('bg-canvas');
+const MC = document.getElementById('main-canvas');
+const bgCtx = BG.getContext('2d');
+const ctx = MC.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+const backBtn = document.getElementById('back-btn');
+
+const BOOKS = [
+  {id:'sappho',title:"Sappho's Fragments",author:"Sappho",year:-600,summary:"The earliest surviving poems of female desire — lyric fragments from the isle of Lesbos, 600 BCE.",cover:'#7b4fa6'},
+  {id:'philips',title:"Poems",author:"Katherine Philips",year:1656,summary:"Welsh poet writing passionate verse to women friends using the language of marriage and devotion.",cover:'#a64f7b'},
+  {id:'behn',title:"To the Fair Clarinda",author:"Aphra Behn",year:1683,summary:"A poem celebrating erotic ambiguity — desire between women made brazen and beautiful.",cover:'#6a4fa6'},
+  {id:'lister',title:"The Diaries",author:"Anne Lister",year:1835,summary:"Coded diaries of a Yorkshire landowner who called herself a gentleman and lived openly with women.",cover:'#4f7ba6'},
+  {id:'well',title:"The Well of Loneliness",author:"Radclyffe Hall",year:1928,summary:"The most famous early lesbian novel in English — banned on publication, a landmark of queer literature.",cover:'#a6754f'},
+  {id:'orlando',title:"Orlando",author:"Virginia Woolf",year:1929,summary:"A fantasy biography crossing centuries and genders — a love letter to Vita Sackville-West.",cover:'#4fa685'},
+  {id:'dalloway',title:"Mrs Dalloway",author:"Virginia Woolf",year:1925,summary:"Clarissa's memory of kissing Sally Seton — one of literature's most exquisite moments of female desire.",cover:'#7ba64f'},
+  {id:'carol',title:"The Price of Salt",author:"Patricia Highsmith",year:1952,summary:"One of the first lesbian novels with a happy ending. Published under a pseudonym. Later known as Carol.",cover:'#a64f4f'},
+  {id:'unicorn',title:"The Black Unicorn",author:"Audre Lorde",year:1978,summary:"Poetry weaving African mythology, Blackness and lesbian desire — one of the great American voices.",cover:'#4f6aa6'},
+  {id:'zami',title:"Zami: A Biomythography",author:"Audre Lorde",year:1983,summary:"A Black Caribbean-American lesbian life traced from childhood through love and community.",cover:'#9b4fa6'},
+  {id:'color',title:"The Color Purple",author:"Alice Walker",year:1982,summary:"Celie and Shug Avery — one of American literature's great love stories, tender and redemptive.",cover:'#a6904f'},
+  {id:'oranges',title:"Oranges Are Not the Only Fruit",author:"Jeanette Winterson",year:1990,summary:"A girl discovers her lesbianism in a Pentecostal household. Won the Whitbread. A British landmark.",cover:'#4fa6a6'},
+];
+
+const CONSTELLATIONS = [
+  {
+    id:'eras', label:'Eras', sublabel:'Through time',
+    color:{h:270,s:70,l:72},
+    cx:0.22, cy:0.42,
+    stars:[
+      {x:0.10,y:0.30},{x:0.18,y:0.22},{x:0.26,y:0.38},
+      {x:0.20,y:0.48},{x:0.14,y:0.55},{x:0.30,y:0.52},
+    ],
+    lines:[[0,1],[1,2],[2,3],[3,4],[4,5],[2,5]],
+    books:[0,1,2,3,4,5],
+  },
+  {
+    id:'regions', label:'Regions', sublabel:'Across the world',
+    color:{h:175,s:65,l:68},
+    cx:0.60, cy:0.30,
+    stars:[
+      {x:0.50,y:0.20},{x:0.58,y:0.14},{x:0.66,y:0.22},
+      {x:0.72,y:0.34},{x:0.62,y:0.40},{x:0.52,y:0.35},
+    ],
+    lines:[[0,1],[1,2],[2,3],[3,4],[4,5],[5,0],[0,4]],
+    books:[6,7,8,9,10,11],
+  },
+  {
+    id:'themes', label:'Themes', sublabel:'Desire · Exile · Faith',
+    color:{h:330,s:65,l:70},
+    cx:0.55, cy:0.68,
+    stars:[
+      {x:0.42,y:0.60},{x:0.50,y:0.70},{x:0.60,y:0.62},
+      {x:0.68,y:0.72},{x:0.56,y:0.78},{x:0.46,y:0.75},
+    ],
+    lines:[[0,1],[1,2],[2,3],[3,4],[4,5],[5,0],[1,4]],
+    books:[0,3,4,7,8,11],
+  },
+];
+
+let W, H, dpr;
+let bgStars = [];
+let t = 0;
+let state = 'sky'; // sky | burst | books
+let activeConst = null;
+let burstProgress = 0;
+let bookNodes = [];
+let hoveredBook = null;
+let labelMode = 0; // cycles on hover: 0=atlas, 1=hover-only, 2=glow
+
+function resize() {
+  dpr = window.devicePixelRatio||1;
+  W = W_EL.clientWidth;
+  H = W_EL.clientHeight;
+  BG.width = W*dpr; BG.height = H*dpr;
+  MC.width = W*dpr; MC.height = H*dpr;
+  BG.style.width = W+'px'; BG.style.height = H+'px';
+  MC.style.width = W+'px'; MC.style.height = H+'px';
+  bgCtx.scale(dpr,dpr);
+  ctx.scale(dpr,dpr);
+  buildBgStars();
+  drawBg();
+}
+
+function buildBgStars() {
+  bgStars = [];
+  const count = Math.floor(W*H/600);
+  for(let i=0;i<count;i++){
+    bgStars.push({
+      x: Math.random()*W,
+      y: Math.random()*H,
+      r: Math.random()<0.92 ? 0.4+Math.random()*0.6 : 0.8+Math.random()*1.2,
+      bright: 0.2+Math.random()*0.8,
+      phase: Math.random()*Math.PI*2,
+      speed: 0.3+Math.random()*1.2,
+      hue: Math.random()<0.6 ? 210 : Math.random()<0.5 ? 280 : Math.random()<0.5 ? 60 : 0,
+    });
+  }
+}
+
+function drawBg() {
+  bgCtx.clearRect(0,0,W,H);
+  // Deep space gradient
+  const grad = bgCtx.createRadialGradient(W*0.5,H*0.4,0,W*0.5,H*0.4,W*0.8);
+  grad.addColorStop(0,'#0d0818');
+  grad.addColorStop(0.4,'#060410');
+  grad.addColorStop(1,'#020108');
+  bgCtx.fillStyle=grad;
+  bgCtx.fillRect(0,0,W,H);
+  // Milky Way haze band
+  const mw = bgCtx.createLinearGradient(0,H*0.3,W,H*0.7);
+  mw.addColorStop(0,'transparent');
+  mw.addColorStop(0.3,'rgba(120,100,180,0.04)');
+  mw.addColorStop(0.5,'rgba(140,110,200,0.07)');
+  mw.addColorStop(0.7,'rgba(120,100,180,0.04)');
+  mw.addColorStop(1,'transparent');
+  bgCtx.fillStyle=mw;
+  bgCtx.fillRect(0,0,W,H);
+  // Background stars (static)
+  bgStars.forEach(s=>{
+    bgCtx.beginPath();
+    bgCtx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    bgCtx.fillStyle=`hsla(${s.hue},40%,90%,${s.bright*0.5})`;
+    bgCtx.fill();
+  });
+}
+
+function starGlow(cx,cy,r,hue,sat,lit,alpha,crossSpike=false){
+  // Outer halo
+  const g1=ctx.createRadialGradient(cx,cy,0,cx,cy,r*4);
+  g1.addColorStop(0,`hsla(${hue},${sat}%,${lit}%,${alpha*0.3})`);
+  g1.addColorStop(1,'transparent');
+  ctx.fillStyle=g1; ctx.beginPath(); ctx.arc(cx,cy,r*4,0,Math.PI*2); ctx.fill();
+  // Core glow
+  const g2=ctx.createRadialGradient(cx,cy,0,cx,cy,r*1.8);
+  g2.addColorStop(0,`hsla(${hue},20%,98%,${alpha})`);
+  g2.addColorStop(0.4,`hsla(${hue},${sat}%,${lit+10}%,${alpha*0.8})`);
+  g2.addColorStop(1,`hsla(${hue},${sat}%,${lit}%,0)`);
+  ctx.fillStyle=g2; ctx.beginPath(); ctx.arc(cx,cy,r*1.8,0,Math.PI*2); ctx.fill();
+  // Hot white centre
+  ctx.beginPath(); ctx.arc(cx,cy,r*0.4,0,Math.PI*2);
+  ctx.fillStyle=`rgba(255,252,245,${alpha})`; ctx.fill();
+  // Diffraction spike
+  if(crossSpike){
+    ctx.save();
+    ctx.globalAlpha=alpha*0.25;
+    ctx.strokeStyle=`hsla(${hue},40%,90%,1)`;
+    ctx.lineWidth=0.5;
+    const len=r*6;
+    ctx.beginPath();ctx.moveTo(cx-len,cy);ctx.lineTo(cx+len,cy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx,cy-len);ctx.lineTo(cx,cy+len);ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function px(rx){return rx*W}
+function py(ry){return ry*H}
+
+function drawSky(){
+  ctx.clearRect(0,0,W,H);
+
+  // Twinkling bg stars
+  bgStars.forEach(s=>{
+    if(s.r<0.7) return; // only animate brighter ones
+    const twink=0.3+0.7*(0.5+0.5*Math.sin(t*s.speed+s.phase));
+    ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    ctx.fillStyle=`hsla(${s.hue},40%,90%,${s.bright*twink})`;
+    ctx.fill();
+  });
+
+  CONSTELLATIONS.forEach(con=>{
+    const c=con.color;
+    const isHovered = hoveredConst===con;
+
+    // Constellation lines
+    con.lines.forEach(([a,b])=>{
+      const s1=con.stars[a], s2=con.stars[b];
+      ctx.beginPath();
+      ctx.moveTo(px(s1.x),py(s1.y));
+      ctx.lineTo(px(s2.x),py(s2.y));
+      ctx.strokeStyle=`hsla(${c.h},50%,70%,${isHovered?0.35:0.12})`;
+      ctx.lineWidth=isHovered?0.8:0.4;
+      ctx.setLineDash([3,6]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    // Stars
+    con.stars.forEach((s,i)=>{
+      const twink=0.6+0.4*Math.sin(t*(0.5+i*0.13)+s.x*10+s.y*7);
+      const r=isHovered?3.5:2.2;
+      const spike=i===0;
+      starGlow(px(s.x),py(s.y),r,c.h,c.s,c.l,twink*(isHovered?1:0.8),spike);
+    });
+
+    // Labels — all 3 modes shown simultaneously as a demo
+    const lx=px(con.cx), ly=py(con.cy);
+
+    // Mode A: atlas style — always visible, faded
+    ctx.save();
+    ctx.font='italic 11px Georgia';
+    ctx.fillStyle=`hsla(${c.h},40%,80%,0.4)`;
+    ctx.textAlign='center';
+    ctx.fillText(con.label, lx, ly-28);
+    ctx.font='10px Georgia';
+    ctx.fillStyle=`hsla(${c.h},30%,70%,0.22)`;
+    ctx.fillText(con.sublabel, lx, ly-16);
+    ctx.restore();
+
+    // Mode B/C: glow on hover
+    if(isHovered){
+      ctx.save();
+      ctx.font='500 13px Georgia';
+      ctx.fillStyle=`hsla(${c.h},60%,88%,0.95)`;
+      ctx.textAlign='center';
+      ctx.shadowColor=`hsla(${c.h},80%,70%,0.6)`;
+      ctx.shadowBlur=12;
+      ctx.fillText(con.label, lx, ly-32);
+      ctx.restore();
+    }
+
+    // Hover hit target (invisible)
+    con._hx=lx; con._hy=ly;
+  });
+}
+
+// Book nodes for burst
+function buildBookNodes(con){
+  const books=con.books.map(i=>BOOKS[i]);
+  const cx=px(con.cx), cy=py(con.cy);
+  const count=books.length;
+  return books.map((b,i)=>{
+    const angle=(i/count)*Math.PI*2 - Math.PI/2;
+    const rad=Math.min(W,H)*0.22;
+    return {
+      book:b,
+      tx:cx+Math.cos(angle)*rad,
+      ty:cy+Math.sin(angle)*rad,
+      sx:cx, sy:cy,
+      x:cx, y:cy,
+      r:28,
+      imgLoaded:false,
+      img:null,
+    };
+  });
+}
+
+function drawBurst(progress){
+  ctx.clearRect(0,0,W,H);
+  const ease=progress<0.5?4*progress*progress*progress:1-Math.pow(-2*progress+2,3)/2;
+
+  // Faded sky behind
+  ctx.globalAlpha=Math.max(0,1-progress*1.5);
+  drawSkyStatic();
+  ctx.globalAlpha=1;
+
+  if(!activeConst) return;
+  const c=activeConst.color;
+  const cx=px(activeConst.cx), cy=py(activeConst.cy);
+
+  // Burst ring
+  if(progress<0.4){
+    const ring=progress/0.4;
+    ctx.beginPath();ctx.arc(cx,cy,ring*Math.min(W,H)*0.3,0,Math.PI*2);
+    ctx.strokeStyle=`hsla(${c.h},70%,80%,${(1-ring)*0.6})`;
+    ctx.lineWidth=1;
+    ctx.stroke();
+  }
+
+  // Book nodes flying out
+  bookNodes.forEach((n,i)=>{
+    const delay=i/bookNodes.length*0.25;
+    const p=Math.max(0,Math.min(1,(progress-delay)/(1-delay)));
+    const ep=p<0.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;
+    n.x=n.sx+(n.tx-n.sx)*ep;
+    n.y=n.sy+(n.ty-n.sy)*ep;
+    const alpha=Math.min(1,p*3);
+    const isH=hoveredBook===i;
+    const r=n.r*(isH?1.15:1);
+
+    ctx.save();
+    ctx.globalAlpha=alpha;
+
+    // Glow ring
+    const grd=ctx.createRadialGradient(n.x,n.y,r*0.8,n.x,n.y,r*1.8);
+    grd.addColorStop(0,`hsla(${c.h},60%,70%,0.3)`);
+    grd.addColorStop(1,'transparent');
+    ctx.fillStyle=grd;
+    ctx.beginPath();ctx.arc(n.x,n.y,r*1.8,0,Math.PI*2);ctx.fill();
+
+    // Clip to circle
+    ctx.beginPath();ctx.arc(n.x,n.y,r,0,Math.PI*2);ctx.clip();
+
+    // Cover placeholder — rich coloured circle with initials
+    const cg=ctx.createRadialGradient(n.x-r*0.3,n.y-r*0.3,0,n.x,n.y,r*1.2);
+    cg.addColorStop(0,n.book.cover+'dd');
+    cg.addColorStop(1,n.book.cover+'44');
+    ctx.fillStyle=cg;
+    ctx.fillRect(n.x-r,n.y-r,r*2,r*2);
+
+    // Initials
+    const initials=n.book.title.split(' ').slice(0,2).map(w=>w[0]).join('');
+    ctx.fillStyle='rgba(255,248,240,0.9)';
+    ctx.font=`${r*0.45}px Georgia`;
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.fillText(initials,n.x,n.y);
+    ctx.textBaseline='alphabetic';
+
+    ctx.restore();
+
+    // Ring border
+    ctx.beginPath();ctx.arc(n.x,n.y,r,0,Math.PI*2);
+    ctx.strokeStyle=isH?`hsla(${c.h},80%,85%,0.9)`:`hsla(${c.h},50%,70%,${alpha*0.5})`;
+    ctx.lineWidth=isH?1.5:0.5;
+    ctx.stroke();
+    ctx.globalAlpha=1;
+
+    n._r=r;
+  });
+}
+
+function drawBooks(){
+  ctx.clearRect(0,0,W,H);
+  if(!activeConst) return;
+  const c=activeConst.color;
+
+  bookNodes.forEach((n,i)=>{
+    const isH=hoveredBook===i;
+    const r=n.r*(isH?1.15:1);
+
+    // Glow
+    const grd=ctx.createRadialGradient(n.x,n.y,r*0.8,n.x,n.y,r*2);
+    grd.addColorStop(0,`hsla(${c.h},60%,70%,${isH?0.4:0.2})`);
+    grd.addColorStop(1,'transparent');
+    ctx.fillStyle=grd;ctx.beginPath();ctx.arc(n.x,n.y,r*2,0,Math.PI*2);ctx.fill();
+
+    ctx.save();
+    ctx.beginPath();ctx.arc(n.x,n.y,r,0,Math.PI*2);ctx.clip();
+    const cg=ctx.createRadialGradient(n.x-r*0.3,n.y-r*0.3,0,n.x,n.y,r*1.2);
+    cg.addColorStop(0,n.book.cover+'ee');
+    cg.addColorStop(1,n.book.cover+'55');
+    ctx.fillStyle=cg;ctx.fillRect(n.x-r,n.y-r,r*2,r*2);
+    const initials=n.book.title.split(' ').slice(0,2).map(w=>w[0]).join('');
+    ctx.fillStyle='rgba(255,248,240,0.9)';
+    ctx.font=`${r*0.45}px Georgia`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(initials,n.x,n.y);
+    ctx.textBaseline='alphabetic';
+    ctx.restore();
+
+    ctx.beginPath();ctx.arc(n.x,n.y,r,0,Math.PI*2);
+    ctx.strokeStyle=isH?`hsla(${c.h},80%,88%,1)`:`hsla(${c.h},50%,70%,0.4)`;
+    ctx.lineWidth=isH?2:0.5;ctx.stroke();
+
+    // Title below
+    ctx.fillStyle=`rgba(220,210,240,${isH?0.9:0.5})`;
+    ctx.font=`${isH?11:9}px Georgia`;
+    ctx.textAlign='center';
+    const words=n.book.title.split(' ');
+    const line1=words.slice(0,2).join(' ');
+    const line2=words.slice(2).join(' ');
+    ctx.fillText(line1,n.x,n.y+r+13);
+    if(line2) ctx.fillText(line2,n.x,n.y+r+24);
+
+    n._r=r;
+  });
+}
+
+function drawSkyStatic(){
+  CONSTELLATIONS.forEach(con=>{
+    const c=con.color;
+    con.lines.forEach(([a,b])=>{
+      const s1=con.stars[a],s2=con.stars[b];
+      ctx.beginPath();ctx.moveTo(px(s1.x),py(s1.y));ctx.lineTo(px(s2.x),py(s2.y));
+      ctx.strokeStyle=`hsla(${c.h},50%,70%,0.1)`;ctx.lineWidth=0.4;ctx.setLineDash([3,6]);ctx.stroke();ctx.setLineDash([]);
+    });
+    con.stars.forEach((s,i)=>{
+      starGlow(px(s.x),py(s.y),2,c.h,c.s,c.l,0.5,false);
+    });
+  });
+}
+
+let hoveredConst=null;
+let animFrame=null;
+
+function loop(){
+  if(state==='sky') drawSky();
+  else if(state==='burst'){
+    burstProgress=Math.min(1,burstProgress+0.018);
+    drawBurst(burstProgress);
+    if(burstProgress>=1){ state='books'; }
+  } else if(state==='books') drawBooks();
+  t+=0.016;
+  animFrame=requestAnimationFrame(loop);
+}
+
+MC.addEventListener('mousemove',e=>{
+  const rect=MC.getBoundingClientRect();
+  const mx=(e.clientX-rect.left), my=(e.clientY-rect.top);
+  tooltip.style.display='none';
+
+  if(state==='sky'){
+    hoveredConst=null;
+    CONSTELLATIONS.forEach(con=>{
+      const hit=con.stars.some(s=>Math.hypot(mx-px(s.x),my-py(s.y))<18);
+      if(hit) hoveredConst=con;
+    });
+    MC.style.cursor=hoveredConst?'pointer':'default';
+  } else if(state==='books'){
+    hoveredBook=null;
+    bookNodes.forEach((n,i)=>{
+      if(Math.hypot(mx-n.x,my-n.y)<n._r+4){ hoveredBook=i; }
+    });
+    if(hoveredBook!==null){
+      MC.style.cursor='pointer';
+      const n=bookNodes[hoveredBook];
+      document.getElementById('tt-title').textContent=n.book.title;
+      document.getElementById('tt-desc').textContent=`${n.book.author} · ${n.book.year<0?Math.abs(n.book.year)+' BCE':n.book.year} · ${n.book.summary}`;
+      let tx=n.x+n.r+12, ty=n.y-20;
+      if(tx+230>W) tx=n.x-n.r-230;
+      tooltip.style.left=tx+'px'; tooltip.style.top=Math.max(8,ty)+'px';
+      tooltip.style.display='block';
+    } else {
+      MC.style.cursor='default';
+    }
+  }
+});
+
+MC.addEventListener('click',e=>{
+  const rect=MC.getBoundingClientRect();
+  const mx=(e.clientX-rect.left), my=(e.clientY-rect.top);
+  if(state==='sky'&&hoveredConst){
+    activeConst=hoveredConst;
+    bookNodes=buildBookNodes(activeConst);
+    burstProgress=0;
+    state='burst';
+    backBtn.style.display='block';
+    tooltip.style.display='none';
+  } else if(state==='books'&&hoveredBook!==null){
+    // double-click handled separately; single click shows tooltip
+  }
+});
+
+MC.addEventListener('dblclick',e=>{
+  if(state==='books'&&hoveredBook!==null){
+    alert('Opening: '+bookNodes[hoveredBook].book.title+'\n(would load book into reader)');
+  }
+});
+
+document.getElementById('tt-open').addEventListener('click',()=>{
+  if(hoveredBook!==null) alert('Opening: '+bookNodes[hoveredBook].book.title+'\n(would load book into reader)');
+});
+
+backBtn.addEventListener('click',()=>{
+  state='sky'; activeConst=null; hoveredBook=null; hoveredConst=null;
+  backBtn.style.display='none'; tooltip.style.display='none';
+});
+
+window.addEventListener('resize',()=>{ cancelAnimationFrame(animFrame); resize(); loop(); });
+resize();
+loop();
+</script>

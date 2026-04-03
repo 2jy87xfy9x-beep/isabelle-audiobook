@@ -1,0 +1,575 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+#sky-wrap{position:relative;width:100%;height:680px;overflow:hidden;background:#080406;cursor:default;user-select:none}
+canvas{position:absolute;inset:0;width:100%;height:100%}
+#back-btn{position:absolute;top:14px;left:16px;z-index:30;display:none;background:rgba(8,4,12,0.7);border:0.5px solid rgba(220,160,200,0.35);color:rgba(220,180,210,0.9);font-family:Georgia,serif;font-size:11px;padding:5px 14px;border-radius:20px;cursor:pointer;letter-spacing:.08em}
+#back-btn:hover{border-color:rgba(220,160,200,0.8);color:#fff}
+#recenter-btn{position:absolute;bottom:16px;right:16px;z-index:30;display:none;background:rgba(8,4,12,0.7);border:0.5px solid rgba(220,160,200,0.35);color:rgba(220,180,210,0.9);font-family:Georgia,serif;font-size:11px;padding:5px 14px;border-radius:20px;cursor:pointer;letter-spacing:.08em}
+#recenter-btn:hover{border-color:rgba(220,160,200,0.8);color:#fff}
+#hint{position:absolute;bottom:16px;left:0;right:0;text-align:center;font-family:Georgia,serif;font-size:10px;color:rgba(220,160,200,0.4);letter-spacing:.08em;pointer-events:none;z-index:20}
+#tooltip{position:absolute;pointer-events:none;z-index:40;display:none;background:rgba(8,3,14,0.95);border:0.5px solid rgba(220,160,200,0.25);border-radius:10px;padding:12px 16px;max-width:210px}
+#tooltip h3{font-family:Georgia,serif;font-size:13px;color:#f0e0ff;font-weight:400;margin-bottom:3px}
+#tooltip .tt-meta{font-size:10px;color:rgba(220,160,200,0.7);font-family:Georgia,serif;margin-bottom:6px;letter-spacing:.04em}
+#tooltip p{font-size:11px;color:rgba(210,190,230,0.75);line-height:1.6;font-family:Georgia,serif}
+#tooltip .open-btn{margin-top:8px;display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(240,180,220,0.9);border:0.5px solid rgba(240,180,220,0.3);padding:4px 10px;border-radius:20px;text-align:center;background:none;cursor:pointer;font-family:Georgia,serif;width:100%;pointer-events:all}
+#tooltip .open-btn:hover{color:#fff;border-color:rgba(240,180,220,0.9)}
+</style>
+
+<div id="sky-wrap">
+  <canvas id="bg-canvas"></canvas>
+  <canvas id="main-canvas"></canvas>
+  <button id="back-btn">← sky</button>
+  <button id="recenter-btn">⊙ recenter</button>
+  <div id="hint">hover a constellation · click to explore</div>
+  <div id="tooltip">
+    <h3 id="tt-title"></h3>
+    <div class="tt-meta" id="tt-meta"></div>
+    <p id="tt-desc"></p>
+    <button class="open-btn" id="tt-open">Open book →</button>
+  </div>
+</div>
+
+<script>
+const wrap = document.getElementById('sky-wrap');
+const BG = document.getElementById('bg-canvas');
+const MC = document.getElementById('main-canvas');
+const bgCtx = BG.getContext('2d');
+const ctx = MC.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+const backBtn = document.getElementById('back-btn');
+const recenterBtn = document.getElementById('recenter-btn');
+const hint = document.getElementById('hint');
+
+const BOOKS = [
+  {id:'sappho',title:"Sappho's Fragments",author:"Sappho",year:-600,region:"Europe",theme:"Desire",summary:"The earliest surviving poems of female desire — lyric fragments from the isle of Lesbos.",cover:'#7b3d9e'},
+  {id:'philips',title:"Poems",author:"Katherine Philips",year:1656,region:"Europe",theme:"Desire",summary:"Welsh poet writing passionate verse to women using the language of marriage and devotion.",cover:'#9e3d6e'},
+  {id:'behn',title:"To the Fair Clarinda",author:"Aphra Behn",year:1683,region:"Europe",theme:"Desire",summary:"A poem celebrating erotic ambiguity — desire between women made brazen and beautiful.",cover:'#6e3d9e'},
+  {id:'lister',title:"The Diaries",author:"Anne Lister",year:1835,region:"Europe",theme:"Resistance",summary:"Coded diaries of a Yorkshire landowner who called herself a gentleman and lived openly with women.",cover:'#3d6e9e'},
+  {id:'dalloway',title:"Mrs Dalloway",author:"Virginia Woolf",year:1925,region:"Europe",theme:"Desire",summary:"Clarissa's memory of kissing Sally Seton — one of literature's most exquisite moments of female desire.",cover:'#3d9e7b'},
+  {id:'well',title:"The Well of Loneliness",author:"Radclyffe Hall",year:1928,region:"Europe",theme:"Resistance",summary:"The most famous early lesbian novel in English — banned on publication, a landmark of queer literature.",cover:'#9e6e3d'},
+  {id:'carol',title:"The Price of Salt",author:"Patricia Highsmith",year:1952,region:"Americas",theme:"Desire",summary:"One of the first lesbian novels with a happy ending. Published under a pseudonym. Later known as Carol.",cover:'#9e3d3d'},
+  {id:'lorde',title:"The Black Unicorn",author:"Audre Lorde",year:1978,region:"Americas",theme:"Resistance",summary:"Poetry weaving African mythology, Blackness and lesbian desire — one of the great American voices.",cover:'#3d4f9e'},
+  {id:'color',title:"The Color Purple",author:"Alice Walker",year:1982,region:"Americas",theme:"Faith",summary:"Celie and Shug Avery — one of American literature's great love stories, tender and redemptive.",cover:'#9e9e3d'},
+  {id:'zami',title:"Zami",author:"Audre Lorde",year:1983,region:"Americas",theme:"Exile",summary:"A Black Caribbean-American lesbian life traced from childhood through love and community.",cover:'#9e3d9e'},
+  {id:'oranges',title:"Oranges Are Not the Only Fruit",author:"Jeanette Winterson",year:1990,region:"Europe",theme:"Faith",summary:"A girl discovers her lesbianism in a Pentecostal household. Won the Whitbread Prize.",cover:'#3d9e9e'},
+  {id:'funhome',title:"Fun Home",author:"Alison Bechdel",year:2005,region:"Americas",theme:"Exile",summary:"A graphic memoir about discovering lesbianism and her father's closeted life. A landmark queer text.",cover:'#7b9e3d'},
+];
+
+const CONSTELLATIONS = [
+  {
+    id:'eras', label:'Through Time', sublabel:'Eras',
+    color:{h:300,s:60,l:70},
+    cx:0.22, cy:0.40,
+    stars:[{x:0.10,y:0.28},{x:0.17,y:0.20},{x:0.25,y:0.36},{x:0.19,y:0.46},{x:0.13,y:0.53},{x:0.29,y:0.50}],
+    lines:[[0,1],[1,2],[2,3],[3,4],[4,5],[2,5]],
+    bookIds:['sappho','philips','behn','lister','dalloway','well'],
+  },
+  {
+    id:'regions', label:'Across the World', sublabel:'Regions',
+    color:{h:175,s:55,l:65},
+    cx:0.62, cy:0.28,
+    stars:[{x:0.52,y:0.18},{x:0.60,y:0.12},{x:0.68,y:0.20},{x:0.74,y:0.32},{x:0.64,y:0.38},{x:0.54,y:0.33}],
+    lines:[[0,1],[1,2],[2,3],[3,4],[4,5],[5,0],[0,4]],
+    bookIds:['sappho','lister','carol','lorde','color','funhome'],
+  },
+  {
+    id:'themes', label:'Desire · Exile · Faith', sublabel:'Themes',
+    color:{h:330,s:60,l:68},
+    cx:0.55, cy:0.68,
+    stars:[{x:0.42,y:0.58},{x:0.50,y:0.68},{x:0.60,y:0.60},{x:0.68,y:0.70},{x:0.56,y:0.76},{x:0.46,y:0.73}],
+    lines:[[0,1],[1,2],[2,3],[3,4],[4,5],[5,0],[1,4]],
+    bookIds:['behn','dalloway','well','zami','oranges','funhome'],
+  },
+];
+
+let W, H, dpr;
+let bgStars = [];
+let t = 0;
+let state = 'sky';
+let activeConst = null;
+let burstProgress = 0;
+let bookNodes = [];
+let hoveredBook = null;
+let hoveredConst = null;
+
+// Pan/zoom state
+let panX = 0, panY = 0, zoom = 1;
+const MIN_ZOOM = 0.85, MAX_ZOOM = 2.2;
+let isPanning = false, panStart = {x:0,y:0}, panOrigin = {x:0,y:0};
+let lastPinchDist = null;
+let targetPanX = 0, targetPanY = 0, targetZoom = 1;
+
+function resize() {
+  dpr = window.devicePixelRatio||1;
+  W = wrap.clientWidth; H = wrap.clientHeight;
+  BG.width=W*dpr; BG.height=H*dpr;
+  MC.width=W*dpr; MC.height=H*dpr;
+  BG.style.width=W+'px'; BG.style.height=H+'px';
+  MC.style.width=W+'px'; MC.style.height=H+'px';
+  bgCtx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  buildBgStars();
+  drawBg();
+}
+
+function buildBgStars() {
+  bgStars = [];
+  const n = Math.floor(W*H/500);
+  for(let i=0;i<n;i++){
+    bgStars.push({
+      x:Math.random()*W, y:Math.random()*H,
+      r:Math.random()<0.88?0.35+Math.random()*0.55:0.7+Math.random()*1.1,
+      bright:0.15+Math.random()*0.75,
+      phase:Math.random()*Math.PI*2,
+      speed:0.3+Math.random()*1.1,
+      hue:Math.random()<0.55?320:Math.random()<0.5?280:Math.random()<0.5?340:200,
+    });
+  }
+}
+
+function drawBg() {
+  bgCtx.clearRect(0,0,W,H);
+  // Deep space — warm dark with pink undertone
+  const grad = bgCtx.createRadialGradient(W*0.5,H*0.38,0,W*0.5,H*0.38,W*0.85);
+  grad.addColorStop(0,'#110810');
+  grad.addColorStop(0.35,'#0a040e');
+  grad.addColorStop(1,'#050208');
+  bgCtx.fillStyle=grad; bgCtx.fillRect(0,0,W,H);
+  // Subtle pink-rose nebula band
+  const mw=bgCtx.createLinearGradient(W*0.1,H*0.2,W*0.9,H*0.75);
+  mw.addColorStop(0,'transparent');
+  mw.addColorStop(0.3,'rgba(180,80,130,0.035)');
+  mw.addColorStop(0.5,'rgba(200,90,150,0.055)');
+  mw.addColorStop(0.7,'rgba(180,80,130,0.035)');
+  mw.addColorStop(1,'transparent');
+  bgCtx.fillStyle=mw; bgCtx.fillRect(0,0,W,H);
+  // Second haze — deeper violet
+  const mw2=bgCtx.createLinearGradient(0,H*0.4,W,H*0.6);
+  mw2.addColorStop(0,'transparent');
+  mw2.addColorStop(0.5,'rgba(130,60,160,0.04)');
+  mw2.addColorStop(1,'transparent');
+  bgCtx.fillStyle=mw2; bgCtx.fillRect(0,0,W,H);
+  // Static dim stars
+  bgStars.forEach(s=>{
+    if(s.r>0.65) return;
+    bgCtx.beginPath(); bgCtx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    bgCtx.fillStyle=`hsla(${s.hue},35%,88%,${s.bright*0.4})`; bgCtx.fill();
+  });
+}
+
+function starGlow(cx,cy,r,hue,sat,lit,alpha,spike=false){
+  const g1=ctx.createRadialGradient(cx,cy,0,cx,cy,r*4.5);
+  g1.addColorStop(0,`hsla(${hue},${sat}%,${lit}%,${alpha*0.25})`);
+  g1.addColorStop(1,'transparent');
+  ctx.fillStyle=g1; ctx.beginPath(); ctx.arc(cx,cy,r*4.5,0,Math.PI*2); ctx.fill();
+  const g2=ctx.createRadialGradient(cx,cy,0,cx,cy,r*1.6);
+  g2.addColorStop(0,`hsla(${hue},15%,98%,${alpha})`);
+  g2.addColorStop(0.5,`hsla(${hue},${sat}%,${lit+8}%,${alpha*0.7})`);
+  g2.addColorStop(1,'transparent');
+  ctx.fillStyle=g2; ctx.beginPath(); ctx.arc(cx,cy,r*1.6,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,r*0.35,0,Math.PI*2);
+  ctx.fillStyle=`rgba(255,248,252,${alpha})`; ctx.fill();
+  if(spike){
+    ctx.save(); ctx.globalAlpha=alpha*0.2;
+    ctx.strokeStyle=`hsla(${hue},40%,92%,1)`; ctx.lineWidth=0.5;
+    const len=r*7;
+    ctx.beginPath();ctx.moveTo(cx-len,cy);ctx.lineTo(cx+len,cy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx,cy-len);ctx.lineTo(cx,cy+len);ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function px(rx){return rx*W} function py(ry){return ry*H}
+
+// Timeline layout after burst
+const TIMELINE = {
+  minYear: -700, maxYear: 2010,
+  y: 0.5, // centre y as fraction
+  padL: 0.08, padR: 0.06,
+};
+
+function yearToX(year){
+  const span=TIMELINE.maxYear-TIMELINE.minYear;
+  return (TIMELINE.padL+((year-TIMELINE.minYear)/span)*(1-TIMELINE.padL-TIMELINE.padR))*W;
+}
+
+function buildBookNodes(con){
+  const books=con.bookIds.map(id=>BOOKS.find(b=>b.id===id)).filter(Boolean);
+  books.sort((a,b)=>a.year-b.year);
+  const cy=py(TIMELINE.y);
+  return books.map((b,i)=>{
+    const tx=yearToX(b.year);
+    const above=i%2===0;
+    const stemLen=40+((i%3)*18);
+    const ty=cy+(above?-stemLen:stemLen);
+    return {
+      book:b, tx, ty,
+      x:px(con.cx), y:py(con.cy),
+      r:22, above,
+      stemY:cy,
+    };
+  });
+}
+
+function easeInOut(p){return p<0.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2}
+
+function applyTransform(){
+  ctx.setTransform(dpr*zoom,0,0,dpr*zoom,panX*dpr,panY*dpr);
+}
+
+function drawTimeline(progress){
+  const c=activeConst.color;
+  const cy=py(TIMELINE.y);
+  const axAlpha=Math.max(0,progress*2-0.5);
+
+  // Axis line
+  if(axAlpha>0){
+    ctx.globalAlpha=axAlpha;
+    ctx.strokeStyle=`hsla(${c.h},40%,70%,0.35)`;
+    ctx.lineWidth=1/zoom;
+    ctx.beginPath();
+    ctx.moveTo(TIMELINE.padL*W, cy);
+    ctx.lineTo((1-TIMELINE.padR)*W, cy);
+    ctx.stroke();
+
+    // Era ticks
+    const eras=[
+      {y:-600,l:'600 BCE'},{y:0,l:'0'},{y:500,l:'500'},
+      {y:1000,l:'1000'},{y:1500,l:'1500'},{y:1700,l:"1700"},
+      {y:1800,l:'1800'},{y:1900,l:'1900'},{y:1950,l:'1950'},{y:2000,l:'Now'},
+    ];
+    eras.forEach(e=>{
+      const x=yearToX(e.y);
+      ctx.strokeStyle=`hsla(${c.h},30%,70%,0.2)`;
+      ctx.lineWidth=0.5/zoom;
+      ctx.beginPath(); ctx.moveTo(x,cy-5); ctx.lineTo(x,cy+5); ctx.stroke();
+      ctx.fillStyle=`hsla(${c.h},25%,78%,0.55)`;
+      ctx.font=`${10/zoom}px Georgia`;
+      ctx.textAlign='center';
+      ctx.fillText(e.l,x,cy+16);
+    });
+    ctx.globalAlpha=1;
+  }
+
+  // Book nodes
+  bookNodes.forEach((n,i)=>{
+    const delay=i/bookNodes.length*0.35;
+    const p=Math.max(0,Math.min(1,(progress-delay)/(1-delay)));
+    const ep=easeInOut(p);
+    const x=n.x+(n.tx-n.x)*ep;
+    const y=n.y+(n.ty-n.y)*ep;
+    const alpha=Math.min(1,p*2.5);
+    const isH=hoveredBook===i;
+    const r=n.r*(isH?1.12:1);
+
+    // Stem to axis
+    if(progress>0.5&&alpha>0.1){
+      ctx.globalAlpha=alpha*0.4;
+      ctx.strokeStyle=`hsla(${c.h},40%,70%,0.5)`;
+      ctx.lineWidth=0.5/zoom;
+      ctx.setLineDash([2/zoom,4/zoom]);
+      ctx.beginPath();
+      ctx.moveTo(x,n.stemY);
+      ctx.lineTo(x,y+(n.above?r:-r));
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha=1;
+    }
+
+    // Year label on axis dot
+    if(progress>0.65&&alpha>0.3){
+      const ax=n.x+(n.tx-n.x)*easeInOut(Math.min(1,(progress-0.3)*2));
+      ctx.globalAlpha=alpha*0.7;
+      ctx.beginPath(); ctx.arc(ax,n.stemY,2.5/zoom,0,Math.PI*2);
+      ctx.fillStyle=`hsla(${c.h},60%,75%,0.9)`; ctx.fill();
+      ctx.fillStyle=`hsla(${c.h},30%,82%,0.8)`;
+      ctx.font=`${9/zoom}px Georgia`; ctx.textAlign='center';
+      ctx.fillText(n.book.year<0?Math.abs(n.book.year)+' BCE':n.book.year, ax, n.stemY+(n.above?12:-6));
+      ctx.globalAlpha=1;
+    }
+
+    // Glow ring
+    ctx.globalAlpha=alpha;
+    const grd=ctx.createRadialGradient(x,y,r*0.7,x,y,r*2.2);
+    grd.addColorStop(0,`hsla(${c.h},65%,68%,0.25)`);
+    grd.addColorStop(1,'transparent');
+    ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(x,y,r*2.2,0,Math.PI*2); ctx.fill();
+
+    // Clip for cover
+    ctx.save();
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.clip();
+    const cg=ctx.createRadialGradient(x-r*0.3,y-r*0.3,0,x,y,r*1.2);
+    cg.addColorStop(0,n.book.cover+'ee');
+    cg.addColorStop(1,n.book.cover+'55');
+    ctx.fillStyle=cg; ctx.fillRect(x-r,y-r,r*2,r*2);
+    const initials=n.book.title.split(' ').filter(w=>w.length>2).slice(0,2).map(w=>w[0]).join('');
+    ctx.fillStyle='rgba(255,245,250,0.92)';
+    ctx.font=`${r*0.42}px Georgia`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(initials,x,y);
+    ctx.textBaseline='alphabetic';
+    ctx.restore();
+    ctx.globalAlpha=1;
+
+    // Border
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.strokeStyle=isH?`hsla(${c.h},80%,88%,0.95)`:`hsla(${c.h},50%,72%,${alpha*0.55})`;
+    ctx.lineWidth=(isH?1.8:0.5)/zoom; ctx.stroke();
+
+    // Title
+    if(alpha>0.5){
+      ctx.fillStyle=`rgba(235,210,240,${isH?0.95:0.65})`;
+      ctx.font=`${isH?10:8.5}px Georgia`;
+      ctx.textAlign='center';
+      const shortTitle=n.book.title.length>18?n.book.title.slice(0,16)+'…':n.book.title;
+      ctx.fillText(shortTitle, x, y+(n.above?-(r+7):r+14));
+    }
+
+    n._x=x; n._y=y; n._r=r;
+  });
+}
+
+function drawSky(){
+  ctx.clearRect(0,0,W,H);
+
+  // Twinkling brighter bg stars
+  bgStars.forEach(s=>{
+    if(s.r<0.65) return;
+    const tw=0.3+0.7*(0.5+0.5*Math.sin(t*s.speed+s.phase));
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    ctx.fillStyle=`hsla(${s.hue},35%,88%,${s.bright*tw})`; ctx.fill();
+  });
+
+  CONSTELLATIONS.forEach(con=>{
+    const c=con.color;
+    const isH=hoveredConst===con;
+
+    // Lines
+    con.lines.forEach(([a,b])=>{
+      const s1=con.stars[a],s2=con.stars[b];
+      ctx.beginPath(); ctx.moveTo(px(s1.x),py(s1.y)); ctx.lineTo(px(s2.x),py(s2.y));
+      ctx.strokeStyle=`hsla(${c.h},45%,72%,${isH?0.38:0.13})`;
+      ctx.lineWidth=isH?0.8:0.4; ctx.setLineDash([3,7]); ctx.stroke(); ctx.setLineDash([]);
+    });
+
+    // Stars
+    con.stars.forEach((s,i)=>{
+      const tw=0.55+0.4*Math.sin(t*(0.45+i*0.14)+s.x*12+s.y*8);
+      const r=isH?3.2:2;
+      starGlow(px(s.x),py(s.y),r,c.h,c.s,c.l,tw*(isH?1:0.75),i===0);
+    });
+
+    // Label — atlas style always, glow on hover
+    const lx=px(con.cx), ly=py(con.cy);
+    ctx.font='italic 10px Georgia';
+    ctx.fillStyle=`hsla(${c.h},35%,80%,${isH?0:0.38})`;
+    ctx.textAlign='center';
+    ctx.fillText(con.label, lx, ly-24);
+    ctx.font='9px Georgia';
+    ctx.fillStyle=`hsla(${c.h},25%,72%,${isH?0:0.22})`;
+    ctx.fillText(con.sublabel, lx, ly-13);
+
+    if(isH){
+      ctx.save();
+      ctx.shadowColor=`hsla(${c.h},75%,72%,0.7)`; ctx.shadowBlur=14;
+      ctx.font='italic 13px Georgia';
+      ctx.fillStyle=`hsla(${c.h},60%,90%,0.95)`;
+      ctx.textAlign='center';
+      ctx.fillText(con.label, lx, ly-26);
+      ctx.restore();
+      ctx.font='10px Georgia';
+      ctx.fillStyle=`hsla(${c.h},40%,78%,0.65)`;
+      ctx.textAlign='center';
+      ctx.fillText(con.sublabel, lx, ly-14);
+    }
+  });
+}
+
+let animFrame;
+function loop(){
+  if(state==='sky'){
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    drawSky();
+  } else {
+    // Smooth pan/zoom lerp
+    panX+=(targetPanX-panX)*0.12;
+    panY+=(targetPanY-panY)*0.12;
+    zoom+=(targetZoom-zoom)*0.12;
+    ctx.setTransform(dpr*zoom,0,0,dpr*zoom,panX*dpr,panY*dpr);
+    ctx.clearRect(-panX/zoom,-panY/zoom,W/zoom,H/zoom);
+
+    // Faded bg stars in world space
+    ctx.save();
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    bgStars.forEach(s=>{
+      if(s.r<0.65) return;
+      const tw=0.3+0.7*(0.5+0.5*Math.sin(t*s.speed+s.phase));
+      ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle=`hsla(${s.hue},35%,88%,${s.bright*tw*0.4})`; ctx.fill();
+    });
+    ctx.restore();
+    ctx.setTransform(dpr*zoom,0,0,dpr*zoom,panX*dpr,panY*dpr);
+
+    if(state==='burst'){
+      burstProgress=Math.min(1,burstProgress+0.016);
+      drawTimeline(burstProgress);
+      if(burstProgress>=1) state='books';
+    } else {
+      drawTimeline(1);
+    }
+  }
+  t+=0.016;
+  animFrame=requestAnimationFrame(loop);
+}
+
+// Hit testing in transformed space
+function worldXY(clientX, clientY){
+  const rect=MC.getBoundingClientRect();
+  const cx=(clientX-rect.left), cy=(clientY-rect.top);
+  return {x:(cx-panX/1)/zoom, y:(cy-panY/1)/zoom};
+}
+
+// Mouse events
+MC.addEventListener('mousemove',e=>{
+  tooltip.style.display='none';
+  if(state==='sky'){
+    hoveredConst=null;
+    CONSTELLATIONS.forEach(con=>{
+      if(con.stars.some(s=>Math.hypot(e.offsetX-px(s.x),e.offsetY-py(s.y))<20)) hoveredConst=con;
+    });
+    MC.style.cursor=hoveredConst?'pointer':'default';
+  } else if(state==='books'||state==='burst'){
+    if(isPanning){
+      targetPanX=panOrigin.x+(e.clientX-panStart.x);
+      targetPanY=panOrigin.y+(e.clientY-panStart.y);
+      clampPan();
+      return;
+    }
+    const {x,y}=worldXY(e.clientX,e.clientY);
+    hoveredBook=null;
+    bookNodes.forEach((n,i)=>{
+      if(n._x!==undefined&&Math.hypot(x-n._x,y-n._y)<(n._r||22)+6) hoveredBook=i;
+    });
+    if(hoveredBook!==null){
+      MC.style.cursor='pointer';
+      const n=bookNodes[hoveredBook];
+      document.getElementById('tt-title').textContent=n.book.title;
+      document.getElementById('tt-meta').textContent=`${n.book.author} · ${n.book.year<0?Math.abs(n.book.year)+' BCE':n.book.year}`;
+      document.getElementById('tt-desc').textContent=n.book.summary;
+      const rect=MC.getBoundingClientRect();
+      let tx=e.clientX-rect.left+14, ty=e.clientY-rect.top-20;
+      if(tx+220>W) tx=e.clientX-rect.left-234;
+      tooltip.style.left=tx+'px'; tooltip.style.top=Math.max(8,ty)+'px';
+      tooltip.style.display='block';
+    } else {
+      MC.style.cursor=isPanning?'grabbing':'grab';
+    }
+  }
+});
+
+MC.addEventListener('mousedown',e=>{
+  if(state==='books'){
+    isPanning=true; panStart={x:e.clientX,y:e.clientY};
+    panOrigin={x:targetPanX,y:targetPanY}; MC.style.cursor='grabbing';
+  }
+});
+MC.addEventListener('mouseup',()=>{isPanning=false;});
+MC.addEventListener('mouseleave',()=>{isPanning=false;tooltip.style.display='none';});
+
+MC.addEventListener('click',e=>{
+  if(isPanning) return;
+  if(state==='sky'&&hoveredConst){
+    activeConst=hoveredConst;
+    bookNodes=buildBookNodes(activeConst);
+    burstProgress=0; state='burst';
+    targetPanX=0; targetPanY=0; targetZoom=1; panX=0; panY=0; zoom=1;
+    backBtn.style.display='block';
+    recenterBtn.style.display='block';
+    hint.textContent='scroll or pinch to zoom · drag to pan · click a cover for details';
+  }
+});
+
+MC.addEventListener('dblclick',e=>{
+  if(state==='books'&&hoveredBook!==null){
+    alert('Opening: '+bookNodes[hoveredBook].book.title);
+  }
+});
+
+// Wheel zoom
+MC.addEventListener('wheel',e=>{
+  if(state==='sky') return;
+  e.preventDefault();
+  const delta=-e.deltaY*0.001;
+  const rect=MC.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  applyZoom(zoom+delta*zoom, mx, my);
+},{passive:false});
+
+// Pinch
+MC.addEventListener('touchstart',e=>{
+  if(e.touches.length===2) lastPinchDist=null;
+  else if(e.touches.length===1&&state!=='sky'){
+    isPanning=true;
+    panStart={x:e.touches[0].clientX,y:e.touches[0].clientY};
+    panOrigin={x:targetPanX,y:targetPanY};
+  }
+},{passive:true});
+MC.addEventListener('touchmove',e=>{
+  if(e.touches.length===2){
+    const dx=e.touches[0].clientX-e.touches[1].clientX;
+    const dy=e.touches[0].clientY-e.touches[1].clientY;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    if(lastPinchDist!==null){
+      const scale=dist/lastPinchDist;
+      const rect=MC.getBoundingClientRect();
+      const mx=(e.touches[0].clientX+e.touches[1].clientX)/2-rect.left;
+      const my=(e.touches[0].clientY+e.touches[1].clientY)/2-rect.top;
+      applyZoom(zoom*scale,mx,my);
+    }
+    lastPinchDist=dist;
+  } else if(e.touches.length===1&&isPanning){
+    targetPanX=panOrigin.x+(e.touches[0].clientX-panStart.x);
+    targetPanY=panOrigin.y+(e.touches[0].clientY-panStart.y);
+    clampPan();
+  }
+},{passive:true});
+MC.addEventListener('touchend',()=>{lastPinchDist=null;isPanning=false;},{passive:true});
+
+function applyZoom(newZoom, mx, my){
+  newZoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,newZoom));
+  const wx=(mx-targetPanX)/zoom, wy=(my-targetPanY)/zoom;
+  targetPanX=mx-wx*newZoom;
+  targetPanY=my-wy*newZoom;
+  targetZoom=newZoom;
+  clampPan();
+}
+
+function clampPan(){
+  const maxPanX=W*(targetZoom-1)*0.6;
+  const maxPanY=H*(targetZoom-1)*0.6;
+  targetPanX=Math.max(-maxPanX,Math.min(maxPanX,targetPanX));
+  targetPanY=Math.max(-maxPanY,Math.min(maxPanY,targetPanY));
+  recenterBtn.style.display=(Math.abs(targetPanX)>5||Math.abs(targetPanY)>5||Math.abs(targetZoom-1)>0.05)?'block':'none';
+  if(state==='books') recenterBtn.style.display='block';
+}
+
+backBtn.addEventListener('click',()=>{
+  state='sky'; activeConst=null; hoveredBook=null; hoveredConst=null;
+  panX=0;panY=0;zoom=1;targetPanX=0;targetPanY=0;targetZoom=1;
+  backBtn.style.display='none'; recenterBtn.style.display='none';
+  tooltip.style.display='none';
+  hint.textContent='hover a constellation · click to explore';
+});
+
+recenterBtn.addEventListener('click',()=>{
+  targetPanX=0;targetPanY=0;targetZoom=1;
+});
+
+document.getElementById('tt-open').addEventListener('click',()=>{
+  if(hoveredBook!==null) alert('Opening: '+bookNodes[hoveredBook].book.title);
+});
+
+window.addEventListener('resize',()=>{cancelAnimationFrame(animFrame);resize();loop();});
+resize(); loop();
+</script>

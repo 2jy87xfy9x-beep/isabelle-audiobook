@@ -1,0 +1,339 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+#root{background:#0a0608;min-height:700px;font-family:Georgia,serif;color:#e8e0d4}
+.row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:#1a0f1e}
+.panel{position:relative;overflow:hidden;background:#0a0608;height:220px;cursor:default}
+.panel-label{position:absolute;top:10px;left:12px;z-index:10;pointer-events:none}
+.panel-label .tag{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:#9b6aaa;margin-bottom:2px}
+.panel-label .name{font-size:12px;color:#e8d4f0}
+.panel-label .sub{font-size:10px;color:#5a3f6a;margin-top:1px}
+.trans-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:#1a0f1e}
+.trans-panel{position:relative;overflow:hidden;background:#0a0608;height:220px;cursor:default}
+.trans-label{position:absolute;top:10px;left:12px;z-index:10;pointer-events:none}
+.trans-label .tag{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:#aa6a8a;margin-bottom:2px}
+.trans-label .name{font-size:12px;color:#f0d4e4}
+.trans-label .sub{font-size:10px;color:#6a3f50;margin-top:1px}
+.section-head{padding:14px 16px 8px;background:#0a0608;border-bottom:1px solid #1a0f1e}
+.section-head h2{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#5a3f6a;font-weight:400}
+.footer{padding:16px;background:#0a0608;font-size:12px;color:#5a3f6a;text-align:center;border-top:1px solid #1a0f1e}
+canvas{width:100%;height:100%;display:block}
+</style>
+
+<div id="root">
+<div class="section-head"><h2>Grouping — how categories sit on the canvas</h2></div>
+<div class="row">
+  <div class="panel" id="p-cloud">
+    <div class="panel-label"><div class="tag">Layout A</div><div class="name">One cloud</div><div class="sub">All mixed, colour = type</div></div>
+    <canvas id="c-cloud"></canvas>
+  </div>
+  <div class="panel" id="p-cluster">
+    <div class="panel-label"><div class="tag">Layout B</div><div class="name">Loose clusters</div><div class="sub">Eras · Regions · Themes</div></div>
+    <canvas id="c-cluster"></canvas>
+  </div>
+  <div class="panel" id="p-const">
+    <div class="panel-label"><div class="tag">Layout C</div><div class="name">Constellations</div><div class="sub">Named groups, lines within</div></div>
+    <canvas id="c-const"></canvas>
+  </div>
+</div>
+
+<div class="section-head" style="margin-top:1px"><h2>Transition — what happens when you click a dot</h2></div>
+<div class="trans-row">
+  <div class="trans-panel" id="p-fade">
+    <div class="trans-label"><div class="tag">Transition A</div><div class="name">Fade replace</div><div class="sub">Click any dot to try</div></div>
+    <canvas id="c-fade"></canvas>
+  </div>
+  <div class="trans-panel" id="p-burst">
+    <div class="trans-label"><div class="tag">Transition B</div><div class="name">Burst out</div><div class="sub">Click any dot to try</div></div>
+    <canvas id="c-burst"></canvas>
+  </div>
+  <div class="trans-panel" id="p-rise">
+    <div class="trans-label"><div class="tag">Transition C</div><div class="name">Shrink &amp; rise</div><div class="sub">Click any dot to try</div></div>
+    <canvas id="c-rise"></canvas>
+  </div>
+</div>
+<div class="footer">Click any dot in the transition panels · Bigger dot = more books · Each pulses at its own rhythm</div>
+</div>
+
+<script>
+const CATS = [
+  {label:"Ancient",type:"era",count:2,x:.18,y:.45},
+  {label:"Medieval",type:"era",count:4,x:.28,y:.35},
+  {label:"18th c",type:"era",count:3,x:.38,y:.55},
+  {label:"19th c",type:"era",count:5,x:.50,y:.40},
+  {label:"20th c",type:"era",count:14,x:.65,y:.50},
+  {label:"Contemporary",type:"era",count:8,x:.80,y:.42},
+  {label:"Europe",type:"region",count:20,x:.22,y:.62},
+  {label:"Americas",type:"region",count:10,x:.45,y:.70},
+  {label:"East Asia",type:"region",count:5,x:.68,y:.28},
+  {label:"Middle East",type:"region",count:3,x:.55,y:.22},
+  {label:"Africa",type:"region",count:3,x:.35,y:.22},
+  {label:"South Asia",type:"region",count:2,x:.75,y:.68},
+  {label:"Poetry",type:"theme",count:12,x:.30,y:.78},
+  {label:"Fiction",type:"theme",count:18,x:.52,y:.82},
+  {label:"Memoir",type:"theme",count:6,x:.70,y:.78},
+  {label:"Exile",type:"theme",count:4,x:.20,y:.20},
+  {label:"Desire",type:"theme",count:15,x:.42,y:.15},
+  {label:"Resistance",type:"theme",count:7,x:.60,y:.72},
+  {label:"Faith",type:"theme",count:3,x:.78,y:.20},
+];
+
+const TYPE_COLOR = {
+  era:    {h:280, base:'#c084e8'},
+  region: {h:175, base:'#84e8c0'},
+  theme:  {h:340, base:'#e884b4'},
+};
+
+function hsl(h,s,l,a=1){return `hsla(${h},${s}%,${l}%,${a})`}
+
+function dotR(cat){ return 4 + (cat.count / 20) * 12; }
+
+function makeDots(canvas, layoutFn) {
+  const parent = canvas.parentElement;
+  const dpr = window.devicePixelRatio||1;
+  canvas.width = parent.clientWidth*dpr;
+  canvas.height = parent.clientHeight*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  const W = parent.clientWidth, H = parent.clientHeight;
+  const dots = CATS.map((c,i) => ({
+    ...c,
+    ...layoutFn(c,i,W,H),
+    phase: Math.random()*Math.PI*2,
+    speed: 0.4+Math.random()*0.6,
+    r: dotR(c),
+  }));
+  let t=0;
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    dots.forEach(d=>{
+      const pulse = 0.55 + 0.35*Math.sin(t*d.speed+d.phase);
+      const col = TYPE_COLOR[d.type];
+      ctx.beginPath();
+      ctx.arc(d.x,d.y,d.r*2.5,0,Math.PI*2);
+      ctx.fillStyle = hsl(col.h,70,55,0.06*pulse);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(d.x,d.y,d.r,0,Math.PI*2);
+      ctx.fillStyle = hsl(col.h,65,60,pulse);
+      ctx.fill();
+      ctx.fillStyle = hsl(col.h,30,88,0.8);
+      ctx.font = `${9+d.r*0.2}px Georgia`;
+      ctx.textAlign='center';
+      ctx.fillText(d.label, d.x, d.y+d.r+10);
+    });
+    t+=0.016;
+    requestAnimationFrame(draw);
+  }
+  draw();
+  return {dots,ctx,W,H};
+}
+
+// Layout A: cloud — use preset positions scattered
+function cloudLayout(c,i,W,H){ return {x:c.x*W, y:c.y*H}; }
+
+// Layout B: loose clusters by type
+function clusterLayout(c,i,W,H){
+  const zones = {era:{cx:.20,cy:.5}, region:{cx:.50,cy:.5}, theme:{cx:.80,cy:.5}};
+  const z = zones[c.type];
+  const idx = CATS.filter(x=>x.type===c.type).indexOf(c);
+  const total = CATS.filter(x=>x.type===c.type).length;
+  const angle = (idx/total)*Math.PI*2;
+  const spread = 0.22;
+  return {x:(z.cx+Math.cos(angle)*spread*0.7)*W, y:(z.cy+Math.sin(angle)*spread)*H};
+}
+
+// Layout C: constellations with connecting lines
+function constLayout(c,i,W,H){ return clusterLayout(c,i,W,H); }
+
+makeDots(document.getElementById('c-cloud'), cloudLayout);
+makeDots(document.getElementById('c-cluster'), clusterLayout);
+
+// Constellation — same layout but draw connection lines within groups
+{
+  const canvas = document.getElementById('c-const');
+  const parent = canvas.parentElement;
+  const dpr = window.devicePixelRatio||1;
+  canvas.width = parent.clientWidth*dpr;
+  canvas.height = parent.clientHeight*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  const W = parent.clientWidth, H = parent.clientHeight;
+  const dots = CATS.map((c,i)=>({
+    ...c, ...constLayout(c,i,W,H),
+    phase:Math.random()*Math.PI*2,
+    speed:0.4+Math.random()*0.6,
+    r:dotR(c),
+  }));
+  const groups = ['era','region','theme'];
+  const groupLabels = {era:'Eras',region:'Regions',theme:'Themes'};
+  let t=0;
+  function drawConst(){
+    ctx.clearRect(0,0,W,H);
+    groups.forEach(type=>{
+      const group = dots.filter(d=>d.type===type);
+      const col = TYPE_COLOR[type];
+      ctx.fillStyle = hsl(col.h,30,88,0.25);
+      ctx.font='9px Georgia';
+      ctx.textAlign='center';
+      const cx = group.reduce((s,d)=>s+d.x,0)/group.length;
+      ctx.fillText(groupLabels[type].toUpperCase(), cx, 14);
+      for(let i=0;i<group.length;i++){
+        for(let j=i+1;j<group.length;j++){
+          ctx.beginPath();
+          ctx.moveTo(group[i].x,group[i].y);
+          ctx.lineTo(group[j].x,group[j].y);
+          ctx.strokeStyle=hsl(col.h,50,50,0.08);
+          ctx.lineWidth=0.5;
+          ctx.stroke();
+        }
+      }
+    });
+    dots.forEach(d=>{
+      const pulse=0.55+0.35*Math.sin(t*d.speed+d.phase);
+      const col=TYPE_COLOR[d.type];
+      ctx.beginPath();ctx.arc(d.x,d.y,d.r*2.5,0,Math.PI*2);
+      ctx.fillStyle=hsl(col.h,70,55,0.06*pulse);ctx.fill();
+      ctx.beginPath();ctx.arc(d.x,d.y,d.r,0,Math.PI*2);
+      ctx.fillStyle=hsl(col.h,65,60,pulse);ctx.fill();
+      ctx.fillStyle=hsl(col.h,30,88,0.8);
+      ctx.font=`${9+d.r*0.2}px Georgia`;ctx.textAlign='center';
+      ctx.fillText(d.label,d.x,d.y+d.r+10);
+    });
+    t+=0.016;
+    requestAnimationFrame(drawConst);
+  }
+  drawConst();
+}
+
+// ── TRANSITION PANELS ─────────────────────────────────────────
+
+function makeTransPanel(canvasId, transitionFn) {
+  const canvas = document.getElementById(canvasId);
+  const parent = canvas.parentElement;
+  const dpr = window.devicePixelRatio||1;
+  canvas.width = parent.clientWidth*dpr;
+  canvas.height = parent.clientHeight*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  const W = parent.clientWidth, H = parent.clientHeight;
+
+  const dots = CATS.slice(0,9).map((c,i)=>{
+    const angle=(i/9)*Math.PI*2;
+    const rad=0.28;
+    return {
+      ...c,
+      x:(0.5+Math.cos(angle)*rad)*W,
+      y:(0.5+Math.sin(angle)*rad)*H,
+      phase:Math.random()*Math.PI*2,
+      speed:0.4+Math.random()*0.6,
+      r:dotR(c),
+    };
+  });
+
+  const BOOK_COUNT = 8;
+  const books = Array.from({length:BOOK_COUNT},(_,i)=>({
+    tx:(0.1+(i%4)*0.25)*W,
+    ty:(0.3+Math.floor(i/4)*0.35)*H,
+    x: W/2, y: H/2,
+    r: 4+Math.random()*4,
+    phase: Math.random()*Math.PI*2,
+    col: [320,280,175,340][i%4],
+  }));
+
+  let state='dots', animT=0, clickedDot=null;
+  let t=0;
+
+  canvas.addEventListener('click', e=>{
+    if(state!=='dots') { state='dots'; animT=0; return; }
+    const rect=canvas.getBoundingClientRect();
+    const mx=(e.clientX-rect.left), my=(e.clientY-rect.top);
+    const hit=dots.find(d=>Math.hypot(mx-d.x,my-d.y)<d.r+8);
+    if(hit){ clickedDot=hit; state='transitioning'; animT=0; }
+  });
+  canvas.style.cursor='pointer';
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    if(state==='dots'||state==='transitioning'){
+      const fade = state==='transitioning' ? Math.max(0,1-animT*2) : 1;
+      dots.forEach(d=>{
+        const pulse=0.55+0.35*Math.sin(t*d.speed+d.phase);
+        const col=TYPE_COLOR[d.type];
+        ctx.globalAlpha=fade;
+        ctx.beginPath();ctx.arc(d.x,d.y,d.r*2.5,0,Math.PI*2);
+        ctx.fillStyle=hsl(col.h,70,55,0.06*pulse);ctx.fill();
+        ctx.beginPath();ctx.arc(d.x,d.y,d.r,0,Math.PI*2);
+        ctx.fillStyle=hsl(col.h,65,60,pulse);ctx.fill();
+        ctx.fillStyle=hsl(col.h,30,88,0.8);
+        ctx.font='9px Georgia';ctx.textAlign='center';
+        ctx.fillText(d.label,d.x,d.y+d.r+9);
+        ctx.globalAlpha=1;
+      });
+      if(state==='transitioning'){ transitionFn(ctx,books,clickedDot,animT,W,H); }
+      if(state==='transitioning') animT=Math.min(animT+0.025,1);
+      if(animT>=1) state='books';
+    } else {
+      transitionFn(ctx,books,clickedDot,1,W,H);
+      ctx.fillStyle='rgba(155,100,140,0.35)';
+      ctx.font='9px Georgia';ctx.textAlign='center';
+      ctx.fillText('tap anywhere to reset',W/2,H-10);
+    }
+    t+=0.016;
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// Transition A: fade replace
+makeTransPanel('c-fade',(ctx,books,dot,progress,W,H)=>{
+  const alpha=Math.max(0,progress*2-1);
+  books.forEach((b,i)=>{
+    const delay=i/books.length*0.4;
+    const a=Math.max(0,(progress-delay)*2.5);
+    const pulse=0.6+0.3*Math.sin(Date.now()*0.002+b.phase);
+    ctx.globalAlpha=Math.min(1,a)*pulse;
+    ctx.beginPath();ctx.arc(b.tx,b.ty,b.r*1.5,0,Math.PI*2);
+    ctx.fillStyle=hsl(b.col,60,60,0.12);ctx.fill();
+    ctx.beginPath();ctx.arc(b.tx,b.ty,b.r,0,Math.PI*2);
+    ctx.fillStyle=hsl(b.col,65,65,1);ctx.fill();
+    ctx.globalAlpha=1;
+  });
+});
+
+// Transition B: burst from dot
+makeTransPanel('c-burst',(ctx,books,dot,progress,W,H)=>{
+  if(!dot) return;
+  const ease=progress<0.5?2*progress*progress:1-Math.pow(-2*progress+2,2)/2;
+  books.forEach((b,i)=>{
+    const x=dot.x+(b.tx-dot.x)*ease;
+    const y=dot.y+(b.ty-dot.y)*ease;
+    const scale=ease;
+    const pulse=0.6+0.3*Math.sin(Date.now()*0.002+b.phase);
+    ctx.globalAlpha=ease*pulse;
+    ctx.beginPath();ctx.arc(x,y,b.r*1.5*scale,0,Math.PI*2);
+    ctx.fillStyle=hsl(b.col,60,60,0.12);ctx.fill();
+    ctx.beginPath();ctx.arc(x,y,b.r*scale,0,Math.PI*2);
+    ctx.fillStyle=hsl(b.col,65,65,1);ctx.fill();
+    ctx.globalAlpha=1;
+  });
+});
+
+// Transition C: shrink & rise
+makeTransPanel('c-rise',(ctx,books,dot,progress,W,H)=>{
+  const ease=progress<0.5?2*progress*progress:1-Math.pow(-2*progress+2,2)/2;
+  books.forEach((b,i)=>{
+    const startY=b.ty+40;
+    const y=startY+(b.ty-startY)*ease;
+    const delay=i/books.length*0.3;
+    const a=Math.max(0,(progress-delay)*3);
+    const pulse=0.6+0.3*Math.sin(Date.now()*0.002+b.phase);
+    ctx.globalAlpha=Math.min(1,a)*pulse;
+    ctx.beginPath();ctx.arc(b.tx,y,b.r*1.5,0,Math.PI*2);
+    ctx.fillStyle=hsl(b.col,60,60,0.12);ctx.fill();
+    ctx.beginPath();ctx.arc(b.tx,y,b.r,0,Math.PI*2);
+    ctx.fillStyle=hsl(b.col,65,65,1);ctx.fill();
+    ctx.globalAlpha=1;
+  });
+});
+</script>
