@@ -1,12 +1,1 @@
-{
-  "version": "0.0.1",
-  "configurations": [
-    {
-      "name": "serve",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["node_modules/serve/build/main.js", "."],
-      "port": 3030,
-      "autoPort": true
-    }
-  ]
-}
+{"version":"0.0.1","configurations":[{"name":"serve-worktree","runtimeExecutable":"python3","runtimeArgs":["-m","http.server","3031"],"port":3031,"autoPort":true}]}
