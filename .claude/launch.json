@@ -3,16 +3,9 @@
   "configurations": [
     {
       "name": "serve",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["node_modules/serve/build/main.js", "."],
-      "port": 3030,
-      "autoPort": true
-    },
-    {
-      "name": "serve-worktree",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["serve", ".worktrees/night-sky-library-studio", "-l", "3031"],
-      "port": 3031,
+      "runtimeArgs": ["serve", ".", "-l", "3030"],
+      "port": 3030,
       "autoPort": true
     }
   ]
