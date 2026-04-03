@@ -183,15 +183,15 @@
       position:fixed;z-index:300;
       padding:4px 8px;max-width:min(260px,55vw);width:max-content;text-align:center;white-space:normal;
       font-family:var(--ui-font);font-size:.63rem;line-height:1.3;font-weight:500;letter-spacing:.02em;
-      color:var(--text);background:var(--surf2);border:1px solid var(--border-hi);
-      border-radius:5px;box-shadow:0 3px 10px rgba(0,0,0,.3);
+      color:#f0e4f8;background:rgba(28,10,42,0.97);border:1px solid rgba(198,123,165,0.65);
+      border-radius:5px;box-shadow:0 4px 16px rgba(0,0,0,.6);
       transform:translateX(-50%);
       opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s ease
     }
     #app-tooltip.visible{opacity:1;visibility:visible}
     #app-tooltip::after{
       content:'';position:absolute;left:50%;top:100%;transform:translateX(-50%);
-      border:5px solid transparent;border-top-color:var(--border-hi);
+      border:5px solid transparent;border-top-color:rgba(198,123,165,0.65);
     }
     .pull-strip{display:none;height:4px;background:linear-gradient(180deg,var(--accent-dim),var(--accent));cursor:pointer;opacity:.55;flex-shrink:0;transition:opacity var(--t)}
     .pull-strip:hover{opacity:1}
@@ -242,6 +242,8 @@
     body.range-mode .letter-paragraph{cursor:pointer}
     .range-banner{display:none;position:fixed;bottom:52px;left:50%;transform:translateX(-50%);background:var(--surf);border:1px solid var(--accent);color:var(--text-m);font-family:var(--ui-font);font-size:.62rem;padding:8px 16px;z-index:50;white-space:nowrap}
     body.range-mode .range-banner{display:block}
+    .rp-start{background:rgba(198,123,165,0.22);outline:1px solid var(--accent)}
+    .rp-end{background:rgba(198,123,165,0.12);outline:1px dashed var(--accent)}
 
     #editor-indicator{display:inline;font-size:.56rem;letter-spacing:.1em;color:var(--text-d);font-family:var(--ui-font);opacity:.45;transition:color var(--t),opacity var(--t)}
     #editor-indicator.active,body.editor-mode #editor-indicator{color:var(--accent);opacity:1}
@@ -325,9 +327,8 @@
     <button type="button" class="bar-icon bar-tip" id="btn-bookshelf" aria-label="Bookshelf" data-tip="Switch book or add a new one">📚</button>
     <button type="button" class="bar-icon bar-tip" id="btn-export" aria-label="Export" data-tip="Export letter or book (HTML, print, plain text)">↓</button>
     <button type="button" class="bar-icon bar-tip" id="btn-smart" aria-label="Smart features" data-tip="Smart scroll and navigation options">✦</button>
-    <button type="button" class="bar-icon bar-tip" id="btn-save" aria-label="Save" data-tip="Download book bundle (.json) — load it back next time to continue">💾</button>
-    <button type="button" class="bar-icon bar-tip" id="btn-snapshot" aria-label="Save place" data-tip="Download a snapshot to save your reading position">⤓</button>
-    <label class="bar-icon bar-tip" id="btn-restore-label" aria-label="Restore place" data-tip="Restore your reading position from a snapshot file" style="cursor:pointer">⤒<input type="file" accept=".json" id="restore-input" style="display:none;position:absolute"></label>
+    <button type="button" class="bar-icon bar-tip" id="btn-save" aria-label="Save" data-tip="Download book bundle (.json) — includes your reading position">↓</button>
+    <label class="bar-icon bar-tip" id="btn-restore-label" aria-label="Restore place" data-tip="Restore reading position from a saved bundle" style="cursor:pointer">↑<input type="file" accept=".json" id="restore-input" style="display:none;position:absolute"></label>
     <button type="button" class="bar-icon bar-collapse bar-tip" id="btn-bottom-collapse" aria-label="Hide controls" data-tip="Hide this bar (shortcut: Shift+H)">▽</button>
     <span id="editor-indicator" class="bar-tip" aria-label="Editor mode active" data-tip="Inline editor is unlocked — tap text to edit">🖉</span>
   </div>
@@ -338,9 +339,9 @@
 
 <div class="range-banner" id="range-banner" aria-live="polite">Click a sentence to set start → click another to set end → copy</div>
 <div id="ctx-sync-dot" aria-hidden="true"></div>
-<div id="smart-features-panel" role="dialog" aria-label="Smart Features" aria-modal="true" tabindex="-1"></div>
-<div id="export-panel" role="dialog" aria-label="Export"></div>
-<div id="bookshelf-panel" role="dialog" aria-label="Bookshelf" aria-modal="true" tabindex="-1">
+<div id="smart-features-panel" role="dialog" aria-label="Smart Features" aria-modal="true" tabindex="-1" aria-hidden="true"></div>
+<div id="export-panel" role="dialog" aria-label="Export" aria-hidden="true"></div>
+<div id="bookshelf-panel" role="dialog" aria-label="Bookshelf" aria-modal="true" tabindex="-1" aria-hidden="true">
   <div class="bs-header">
     <span class="bs-title">Library</span>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1343,7 +1344,6 @@ function updateNarratorLine(sentenceIndex, totalSentences) {
 }
 
 function initSmartScroll(contentEl) {
-  if (!isEnabled('smart-scroll')) return;
   let _scrollTimer = null;
   contentEl.addEventListener('scroll', () => {
     clearTimeout(_scrollTimer);
@@ -1999,8 +1999,13 @@ function renderCurrentLetter() {
     });
   });
   body.querySelectorAll('.letter-paragraph').forEach((p, i) => {
-    p.addEventListener('click', () => handleParaClick(p, i));
-    p.addEventListener('dblclick', () => openInlineEdit(p));
+    p.addEventListener('click', () => {
+      if (isEditorUnlocked()) {
+        openInlineEdit(p);
+      } else {
+        handleParaClick(p, i);
+      }
+    });
     attachLongPress(p, () => openInlineEdit(p));
   });
   container.appendChild(body);
@@ -2390,7 +2395,11 @@ function initPlayer() {
         p.classList.remove('current')
       );
       const el = document.querySelector(`.letter-paragraph[data-paragraph-index="${idx}"]`);
-      if (el) el.classList.add('current');
+      if (el) {
+        el.classList.add('current');
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+      applyMode(idx);
     },
     onWord: () => {},
     onEnd: () => {
@@ -2468,6 +2477,7 @@ function handleParaClick(el, paraIdx) {
     p.classList.remove('current')
   );
   el.classList.add('current');
+  applyMode(paraIdx);
 }
 
 function toggleRangeMode() {
@@ -2488,6 +2498,22 @@ function handleRangeClick(el) {
     const text = [rangeStart.textContent, el.textContent].join(' … ');
     navigator.clipboard.writeText(text).then(() => {
       showFeedback('Copied');
+      toggleRangeMode();
+    }).catch(() => {
+      // Clipboard API unavailable (e.g. HTTP) — fall back to execCommand
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showFeedback('Copied');
+      } catch {
+        showFeedback('Copy failed — select text manually');
+      }
       toggleRangeMode();
     });
   }
@@ -2529,7 +2555,7 @@ function initPanelResize() {
   };
 
   const bind = (gutter, mode) => {
-    gutter.addEventListener('mousedown', (e) => {
+    gutter.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       e.preventDefault();
       const startX = e.clientX;
@@ -2550,8 +2576,8 @@ function initPanelResize() {
         }
       };
       const onUp = () => {
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
         const cs2 = getComputedStyle(app);
@@ -2569,8 +2595,8 @@ function initPanelResize() {
       };
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
     });
 
     gutter.addEventListener('keydown', (e) => {
@@ -2607,7 +2633,7 @@ function initBottomBarResize() {
     localStorage.setItem(LS('bottom-bar-max-h'), String(h));
   };
 
-  gutter.addEventListener('mousedown', (e) => {
+  gutter.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 || bar.classList.contains('collapsed')) return;
     e.preventDefault();
     const startY = e.clientY;
@@ -2617,15 +2643,15 @@ function initBottomBarResize() {
       applyH(startH + dy);
     };
     const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
     document.body.style.cursor = 'row-resize';
     document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   });
 
   gutter.addEventListener('keydown', (e) => {
@@ -2822,30 +2848,21 @@ function wireControls() {
   });
   document.getElementById('btn-save').addEventListener('click', () => saveAll());
 
-  document.getElementById('btn-snapshot')?.addEventListener('click', () => {
-    const letter = currentLetter();
-    if (!letter) return;
-    downloadSnapshot({
-      letter_id: letter.id,
-      paragraph_index: 0,
-      active_view: letterViewKey(letter),
-      letters_read: lettersRead,
-    });
-    showFeedback('Snapshot downloaded.');
-  });
-
   const restoreInput = document.getElementById('restore-input');
   restoreInput?.addEventListener('change', async () => {
     const file = restoreInput.files?.[0];
     if (!file) return;
     try {
-      const snap = await restoreFromFile(file);
-      if (snap.letters_read) snap.letters_read.forEach((id) => lettersRead.add(id));
-      const idx = letters.findIndex((l) => l.id === snap.letter_id);
+      const data = await restoreFromFile(file);
+      // Support bundle format { book: { lastPosition } } or legacy snapshot { letter_id, ... }
+      const pos = data.book?.lastPosition ?? data;
+      const readList = data.book?.lettersRead ?? data.letters_read;
+      if (Array.isArray(readList)) readList.forEach((id) => lettersRead.add(id));
+      const idx = letters.findIndex((l) => l.id === pos.letter_id);
       if (idx >= 0) goToLetter(idx);
       showFeedback('Place restored.');
     } catch {
-      showFeedback('Could not read snapshot file.');
+      showFeedback('Could not read file.');
     }
     restoreInput.value = '';
   });
@@ -2945,6 +2962,36 @@ function wireControls() {
     if (rangeModeActive) toggleRangeMode();
   });
 
+  document.addEventListener('click', (e) => {
+    // Close smart features panel when clicking outside
+    if (smartPanel.classList.contains('open') &&
+        !smartPanel.contains(e.target) &&
+        !document.getElementById('btn-smart').contains(e.target)) {
+      smartPanel.classList.remove('open');
+    }
+    // Close export panel when clicking outside
+    const exportPanel = document.getElementById('export-panel');
+    if (exportPanel.classList.contains('open') &&
+        !exportPanel.contains(e.target) &&
+        !document.getElementById('btn-export').contains(e.target)) {
+      exportPanel.classList.remove('open');
+    }
+    // Close bookshelf panel when clicking outside
+    const bookshelfPanel = document.getElementById('bookshelf-panel');
+    if (bookshelfPanel.classList.contains('open') &&
+        !bookshelfPanel.contains(e.target) &&
+        !document.getElementById('btn-bookshelf').contains(e.target)) {
+      closeBookshelf();
+    }
+    // Close inline editor when clicking outside the editing paragraph
+    const editingEl = document.querySelector('.letter-paragraph[contenteditable="true"]');
+    if (editingEl &&
+        !editingEl.contains(e.target) &&
+        !document.getElementById('inline-toolbar')?.contains(e.target)) {
+      window._editor?.closeInlineEdit();
+    }
+  }, { capture: false });
+
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (smartPanel.classList.contains('open')) {
@@ -3021,6 +3068,15 @@ function buildExportPanel() {
 }
 
 window._editor = { applyInlineFormat, closeInlineEdit };
+
+// Keep aria-hidden in sync with the .open class on panel dialogs
+['smart-features-panel', 'export-panel', 'bookshelf-panel'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  new MutationObserver(() => {
+    el.setAttribute('aria-hidden', el.classList.contains('open') ? 'false' : 'true');
+  }).observe(el, { attributeFilter: ['class'] });
+});
 
 init();
 </script>
