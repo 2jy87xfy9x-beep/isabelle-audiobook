@@ -424,6 +424,7 @@
     <button type="button" class="bar-icon bar-tip" id="btn-focus" aria-label="Reading mode" data-tip="Cycle reading focus: off → reveal → spotlight → fade ahead → page view">⊞</button>
     <button type="button" class="bar-icon bar-tip" id="btn-context" aria-label="Context panel" data-tip="Show or hide the context / references panel">📖</button>
     <button type="button" class="bar-icon bar-tip" id="btn-sidebar" aria-label="Navigation" data-tip="Show or hide the letter list">≡</button>
+    <button type="button" class="bar-icon bar-tip" id="btn-sky-library" aria-label="Library" data-tip="Return to the Night Sky Library">⌂</button>
     <button type="button" class="bar-icon bar-tip" id="btn-bookshelf" aria-label="Bookshelf" data-tip="Switch book or add a new one">📚</button>
     <button type="button" class="bar-icon bar-tip" id="btn-export" aria-label="Export" data-tip="Export letter or book (HTML, print, plain text)">↓</button>
     <button type="button" class="bar-icon bar-tip" id="btn-smart" aria-label="Smart features" data-tip="Smart scroll and navigation options">✦</button>
@@ -1905,6 +1906,7 @@ function bsEsc(s) {
 }
 
 function initBookshelf() {
+  document.getElementById('btn-sky-library').addEventListener('click', initSkyLibrary);
   document.getElementById('btn-bookshelf').addEventListener('click', toggleBookshelf);
   document.getElementById('bs-btn-add').addEventListener('click', bsAddBook);
   document.getElementById('bs-btn-close').addEventListener('click', closeBookshelf);
@@ -3605,6 +3607,7 @@ const TOOLBAR_DEFAULTS = [
   { id:'btn-focus',          icon:'⊞',  label:'Reading mode',   size:'md', visible:true },
   { id:'btn-context',        icon:'📖', label:'Context',        size:'md', visible:true },
   { id:'btn-sidebar',        icon:'≡',  label:'Navigation',     size:'md', visible:true },
+  { id:'btn-sky-library',    icon:'⌂',  label:'Library',        size:'md', visible:true },
   { id:'btn-bookshelf',      icon:'📚', label:'Bookshelf',      size:'md', visible:true },
   { id:'btn-export',         icon:'↓',  label:'Export',         size:'md', visible:true },
   { id:'btn-smart',          icon:'✦',  label:'Smart features', size:'md', visible:true },
